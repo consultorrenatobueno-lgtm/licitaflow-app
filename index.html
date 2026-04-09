@@ -781,7 +781,7 @@ tbody tr:hover td { background: #faf9f7; }
 
     <div id="login-first-access-hint" style="display:none;background:rgba(184,115,51,0.08);border:1px solid rgba(184,115,51,0.3);border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:var(--steel2);line-height:1.6">
       <strong style="color:var(--bronze)">Primeiro acesso:</strong><br>
-      Usuário: <code style="background:var(--off);padding:1px 4px;border-radius:3px">admin</code> &nbsp; Senha: <code style="background:var(--off);padding:1px 4px;border-radius:3px">tbc@2025</code><br>
+      Usuário: <code style="background:var(--off);padding:1px 4px;border-radius:3px">admin</code> &nbsp; Senha: <code style="background:var(--off);padding:1px 4px;border-radius:3px">tbc@2026</code><br>
       <span style="font-size:11px;color:var(--silver2)">Você será solicitado a criar uma nova senha.</span>
     </div>
 
@@ -1137,8 +1137,8 @@ function checkPassword(password, stored) {
   return stored === password;
 }
 
-// Senha padrão do admin: tbc@2025 (será trocada no primeiro acesso)
-var ADMIN_DEFAULT_HASH = hashPassword('tbc@2025', 'tbcadm1');
+// Senha padrão do admin: tbc@2026 (será trocada no primeiro acesso)
+var ADMIN_DEFAULT_HASH = hashPassword('tbc@2026', 'tbcadm1');
 
 var db = {
   users: [
@@ -1527,7 +1527,7 @@ function openRecoverAdmin() {
     + '</div>'
     + '<div style="padding:0 24px 24px;display:flex;flex-direction:column;gap:14px">'
     + '<div style="font-size:13px;color:var(--steel2);line-height:1.6">'
-    + 'Redefine a senha do usuário <strong>admin</strong> para o padrão (<code style="background:var(--off);padding:1px 6px;border-radius:3px;font-family:IBM Plex Mono,monospace">tbc@2025</code>) sem apagar nenhum dado.'
+    + 'Redefine a senha do usuário <strong>admin</strong> para o padrão (<code style="background:var(--off);padding:1px 6px;border-radius:3px;font-family:IBM Plex Mono,monospace">tbc@2026</code>) sem apagar nenhum dado.'
     + '</div>'
     + '<div style="background:rgba(184,115,51,0.08);border:1px solid rgba(184,115,51,0.25);border-radius:8px;padding:12px 14px">'
     + '<div style="font-size:11px;font-weight:700;color:var(--bronze);margin-bottom:8px;letter-spacing:0.5px">Para confirmar, digite: RECUPERAR</div>'
@@ -1559,11 +1559,11 @@ function openRecoverAdmin() {
     if(btn.disabled) return;
     var admin = db.users.find(function(u){ return u.username === 'admin'; });
     if (admin) {
-      admin.password = hashPassword('tbc@2025', 'tbcadm1');
+      admin.password = hashPassword('tbc@2026', 'tbcadm1');
       admin.active = true;
       admin.forcePwdChange = true;
     } else {
-      db.users.unshift({ id:'U001', name:'Administrador TBC', username:'admin', password:hashPassword('tbc@2025','tbcadm1'), email:'admin@tbc.com.br', role:'admin', active:true, color:'#b87333', forcePwdChange:true });
+      db.users.unshift({ id:'U001', name:'Administrador TBC', username:'admin', password:hashPassword('tbc@2026','tbcadm1'), email:'admin@tbc.com.br', role:'admin', active:true, color:'#b87333', forcePwdChange:true });
     }
     saveDB();
     overlay.remove();
@@ -1571,7 +1571,7 @@ function openRecoverAdmin() {
     if (hint) hint.style.display = 'block';
     document.getElementById('login-user').value = 'admin';
     document.getElementById('login-pass').value = '';
-    document.getElementById('login-error').textContent = 'Senha redefinida! Entre com admin / tbc@2025';
+    document.getElementById('login-error').textContent = 'Senha redefinida! Entre com admin / tbc@2026';
     document.getElementById('login-error').style.color = 'var(--green)';
     document.getElementById('login-pass').focus();
   };
