@@ -1193,6 +1193,49 @@ function _showSync(msg, color) {
 }
 
 var _saveTimer = null;
+// ── Polling de sincronização ──────────────────────────────────────────────────
+var _pollTimer = null;
+var _pollInterval = 30000; // 30 segundos
+var _lastRemoteHash = null;
+
+function _hashDB(data) {
+  // Hash simples para detectar mudanças: stringify + tamanho + primeiros chars
+  try {
+    var s = JSON.stringify({ cards: data.cards, clients: data.clients, users: data.users });
+    return s.length + '_' + s.slice(0, 80);
+  } catch(e) { return null; }
+}
+
+function _startPolling() {
+  _stopPolling();
+  _pollTimer = setInterval(function() {
+    if (!_authToken || !currentUser) { _stopPolling(); return; }
+    fetch(API_URL + '/db', { headers: _authHeaders() })
+    .then(function(r) {
+      if (!r.ok) return null;
+      return r.json();
+    })
+    .then(function(data) {
+      if (!data || (!data.cards && !data.users)) return;
+      var h = _hashDB(data);
+      if (_lastRemoteHash === null) { _lastRemoteHash = h; return; } // primeira leitura, apenas registra
+      if (h !== _lastRemoteHash) {
+        _lastRemoteHash = h;
+        _applyDB(data);
+        try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+        render();
+        _showSync('↻ dados atualizados', 'var(--blue2)');
+      }
+    })
+    .catch(function() { /* falha silenciosa no polling */ });
+  }, _pollInterval);
+}
+
+function _stopPolling() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+  _lastRemoteHash = null;
+}
+
 function saveDB() {
   // Salva localmente como fallback imediato
   try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
@@ -1206,7 +1249,7 @@ function saveDB() {
       body: JSON.stringify(db)
     })
     .then(function(r){ return r.json(); })
-    .then(function(){ _showSync('✓ salvo', 'var(--green)'); })
+    .then(function(){ _showSync('✓ salvo', 'var(--green)'); _lastRemoteHash = _hashDB(db); })
     .catch(function(){ _showSync('⚠ offline — salvo localmente', 'var(--gold)'); });
   }, 800);
 }
@@ -1247,12 +1290,15 @@ function loadDBRemote(callback) {
     if (data && (data.users || data.cards)) {
       _applyDB(data);
       try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+      _lastRemoteHash = _hashDB(db);
       render();
       _showSync('✓ dados carregados', 'var(--green)');
     } else {
+      _lastRemoteHash = _hashDB(db);
       _showSync('✓ banco pronto', 'var(--green)');
     }
     if (typeof callback === 'function') callback();
+    _startPolling(); // inicia sincronização automática após primeiro load
   })
   .catch(function() {
     _showSync('⚠ usando dados locais', 'var(--gold)');
@@ -1498,6 +1544,8 @@ function saveChangeMyPassword() {
 document.getElementById('login-pass').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
 
 function doLogout() {
+  // Para o polling de sincronização
+  _stopPolling();
   // Invalida sessão na API
   if (_authToken) {
     fetch(API_URL + '/auth/logout', { method: 'POST', headers: _authHeaders() }).catch(function(){});
