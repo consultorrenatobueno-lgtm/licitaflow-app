@@ -1294,9 +1294,10 @@ function _applyDB(saved) {
 }
 
 function loadDBRemote(callback) {
-  _showSync('⟳ carregando dados…');
-  var tok = null;
-  try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
+ _showSync('⟳ carregando dados…');
+db.cards = []; db.clients = [];
+var tok = _authToken;
+try { var ls = localStorage.getItem(AUTH_TOKEN_KEY); if(ls) tok = ls; } catch(e) {}
   fetch(API_URL + '/db', { headers: { 'Content-Type': 'application/json', 'x-auth-token': tok || _authToken || '' } })
   .then(function(r){ return r.json(); })
   .then(function(data) {
