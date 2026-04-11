@@ -1194,14 +1194,20 @@ function _showSync(msg, color) {
 
 // ── Polling de sincronização ──
 var _pollTimer = null;
-var _pollInterval = 30000;
+var _pollInterval = 15000;
 var _lastRemoteHash = null;
 var _saveTimer = null;
 
 function _hashDB(data) {
   try {
     var s = JSON.stringify({ cards: data.cards, clients: data.clients, users: data.users });
-    return s.length + '_' + s.slice(0, 100);
+    // djb2 hash sobre o JSON completo — detecta qualquer mudança de conteúdo
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) {
+      h = ((h << 5) + h) ^ s.charCodeAt(i);
+      h = h & h; // manter 32 bits
+    }
+    return h.toString(36);
   } catch(e) { return null; }
 }
 
@@ -1210,9 +1216,9 @@ function _startPolling() {
   _pollTimer = setInterval(function() {
     if (!_authToken || !currentUser) { _stopPolling(); return; }
     // Reler token do localStorage para garantir que está atualizado
-    var tok = _authToken;
-try { var ls = localStorage.getItem(AUTH_TOKEN_KEY); if(ls) tok = ls; } catch(e) {}
-if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)'); return; }
+    var tok = null;
+    try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
+    if (!tok) { _stopPolling(); return; }
     fetch(API_URL + '/db', { headers: { 'Content-Type': 'application/json', 'x-auth-token': tok } })
     .then(function(r) { if (!r.ok) return null; return r.json(); })
     .then(function(data) {
@@ -1240,9 +1246,9 @@ function saveDB() {
   // Salva localmente imediatamente
   try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
   // Reler token do localStorage para garantir que está atualizado
-  var tok = _authToken;
-try { var ls = localStorage.getItem(AUTH_TOKEN_KEY); if(ls) tok = ls; } catch(e) {}
-if (!tok) { _stopPolling(); return; }
+  var tok = null;
+  try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
+  if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)'); return; }
   // Debounce: aguarda 500ms antes de enviar para a API
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
@@ -1266,7 +1272,14 @@ if (!tok) { _stopPolling(); return; }
 }
 
 function loadDB() {
-  // não carrega cache na inicialização — aguarda login + API
+  // Carrega do localStorage como estado inicial (evita tela branca)
+  try {
+    var raw = localStorage.getItem(DB_KEY);
+    if (raw) {
+      var saved = JSON.parse(raw);
+      if (saved && saved.users) _applyDB(saved);
+    }
+  } catch(e) {}
 }
 
 function _applyDB(saved) {
@@ -1287,25 +1300,24 @@ function _applyDB(saved) {
 }
 
 function loadDBRemote(callback) {
- _showSync('⟳ carregando dados…');
-db.cards = []; db.clients = [];
-var tok = _authToken;
-try { var ls = localStorage.getItem(AUTH_TOKEN_KEY); if(ls) tok = ls; } catch(e) {}
+  _showSync('⟳ carregando dados…');
+  var tok = null;
+  try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
   fetch(API_URL + '/db', { headers: { 'Content-Type': 'application/json', 'x-auth-token': tok || _authToken || '' } })
   .then(function(r){ return r.json(); })
   .then(function(data) {
     if (data && (data.users || data.cards)) {
-  _applyDB(data);
-  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
-  _lastRemoteHash = _hashDB(db);
-  if (typeof callback === 'function') callback();
-_showSync('✓ dados carregados', 'var(--green)');
-} else {
-  _lastRemoteHash = _hashDB(db);
-  _showSync('✓ banco pronto', 'var(--green)');
-  if (typeof callback === 'function') callback();
-}
-_startPolling();
+      _applyDB(data);
+      try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+      _lastRemoteHash = _hashDB(db);
+      render();
+      _showSync('✓ dados carregados', 'var(--green)');
+    } else {
+      _lastRemoteHash = _hashDB(db);
+      _showSync('✓ banco pronto', 'var(--green)');
+    }
+    if (typeof callback === 'function') callback();
+    _startPolling();
   })
   .catch(function() {
     _showSync('⚠ usando dados locais', 'var(--gold)');
@@ -1406,6 +1418,29 @@ function confirmResetDB() {
 
 loadDB();       // carrega localStorage imediatamente (sem tela branca)
 // loadDBRemote só será chamado após login bem-sucedido
+
+// Ao voltar à aba, força uma busca imediata na API
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && _authToken && currentUser) {
+    var tok = null;
+    try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
+    if (!tok) return;
+    fetch(API_URL + '/db', { headers: { 'Content-Type': 'application/json', 'x-auth-token': tok } })
+    .then(function(r) { if (!r.ok) return null; return r.json(); })
+    .then(function(data) {
+      if (!data || (!data.cards && !data.users)) return;
+      var h = _hashDB(data);
+      if (h !== _lastRemoteHash) {
+        _lastRemoteHash = h;
+        _applyDB(data);
+        try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+        render();
+        _showSync('↻ dados atualizados', 'var(--blue2)');
+      }
+    })
+    .catch(function() {});
+  }
+});
 
 // Mostrar hint de primeiro acesso se admin ainda não trocou a senha padrão
 (function() {
@@ -1558,8 +1593,8 @@ function doLogout() {
   if (_authToken) {
     fetch(API_URL + '/auth/logout', { method: 'POST', headers: _authHeaders() }).catch(function(){});
   }
-_setToken(null);
-currentUser = null;
+  _setToken(null);
+  currentUser = null;
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   document.getElementById('client-portal').style.display = 'none';
