@@ -1301,17 +1301,18 @@ function loadDBRemote(callback) {
   .then(function(r){ return r.json(); })
   .then(function(data) {
     if (data && (data.users || data.cards)) {
-      _applyDB(data);
-      try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
-      _lastRemoteHash = _hashDB(db);
-      render();
-      _showSync('✓ dados carregados', 'var(--green)');
-    } else {
-      _lastRemoteHash = _hashDB(db);
-      _showSync('✓ banco pronto', 'var(--green)');
-    }
-    if (typeof callback === 'function') callback();
-    _startPolling();
+  _applyDB(data);
+  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+  _lastRemoteHash = _hashDB(db);
+  if (typeof callback === 'function') callback();
+  render();
+  _showSync('✓ dados carregados', 'var(--green)');
+} else {
+  _lastRemoteHash = _hashDB(db);
+  _showSync('✓ banco pronto', 'var(--green)');
+  if (typeof callback === 'function') callback();
+}
+_startPolling();
   })
   .catch(function() {
     _showSync('⚠ usando dados locais', 'var(--gold)');
@@ -1564,11 +1565,8 @@ function doLogout() {
   if (_authToken) {
     fetch(API_URL + '/auth/logout', { method: 'POST', headers: _authHeaders() }).catch(function(){});
   }
-  _setToken(null);
+_setToken(null);
 currentUser = null;
-db.cards = []; db.clients = [];
-db.users = [{ id:'U001', name:'Administrador TBC', username:'admin', password:ADMIN_DEFAULT_HASH, email:'admin@tbc.com.br', role:'admin', active:true, color:'#b87333', forcePwdChange:true }];
-db.nextCardId = 1; db.nextUserId = 2; db.nextClientId = 1;
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   document.getElementById('client-portal').style.display = 'none';
