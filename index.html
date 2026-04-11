@@ -1711,7 +1711,14 @@ function showApp(user) {
 // ═══════════════════════════════════════════════════════
 
 function showClientPortal(user) {
-  var client = db.clients.find(function(c){ return c.email === user.email; });
+  var client = db.clients.find(function(c){ 
+  return c.email && user.email && 
+         c.email.toLowerCase().trim() === user.email.toLowerCase().trim(); 
+}) || db.clients.find(function(c){
+  // fallback: busca pelo username do usuário (caso e-mail não bata)
+  return c.email && user.username && 
+         c.email.toLowerCase().trim() === user.username.toLowerCase().trim();
+});
   var allCards = db.cards.filter(function(c){ return c.clienteId && client && c.clienteId === client.id; });
 
   // Active: not yet in resultado col, or in resultado but approved via nomeacao (still showing)
