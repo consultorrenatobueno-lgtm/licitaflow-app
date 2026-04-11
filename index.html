@@ -1266,14 +1266,7 @@ if (!tok) { _stopPolling(); return; }
 }
 
 function loadDB() {
-  // Carrega do localStorage como estado inicial (evita tela branca)
-  try {
-    var raw = localStorage.getItem(DB_KEY);
-    if (raw) {
-      var saved = JSON.parse(raw);
-      if (saved && saved.users) _applyDB(saved);
-    }
-  } catch(e) {}
+  // não carrega cache na inicialização — aguarda login + API
 }
 
 function _applyDB(saved) {
@@ -1306,8 +1299,7 @@ try { var ls = localStorage.getItem(AUTH_TOKEN_KEY); if(ls) tok = ls; } catch(e)
   try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
   _lastRemoteHash = _hashDB(db);
   if (typeof callback === 'function') callback();
-  render();
-  _showSync('✓ dados carregados', 'var(--green)');
+_showSync('✓ dados carregados', 'var(--green)');
 } else {
   _lastRemoteHash = _hashDB(db);
   _showSync('✓ banco pronto', 'var(--green)');
