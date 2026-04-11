@@ -1210,9 +1210,9 @@ function _startPolling() {
   _pollTimer = setInterval(function() {
     if (!_authToken || !currentUser) { _stopPolling(); return; }
     // Reler token do localStorage para garantir que está atualizado
-    var tok = null;
-    try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
-    if (!tok) { _stopPolling(); return; }
+    var tok = _authToken;
+try { var ls = localStorage.getItem(AUTH_TOKEN_KEY); if(ls) tok = ls; } catch(e) {}
+if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)'); return; }
     fetch(API_URL + '/db', { headers: { 'Content-Type': 'application/json', 'x-auth-token': tok } })
     .then(function(r) { if (!r.ok) return null; return r.json(); })
     .then(function(data) {
@@ -1240,9 +1240,9 @@ function saveDB() {
   // Salva localmente imediatamente
   try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
   // Reler token do localStorage para garantir que está atualizado
-  var tok = null;
-  try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
-  if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)'); return; }
+  var tok = _authToken;
+try { var ls = localStorage.getItem(AUTH_TOKEN_KEY); if(ls) tok = ls; } catch(e) {}
+if (!tok) { _stopPolling(); return; }
   // Debounce: aguarda 500ms antes de enviar para a API
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
@@ -1565,7 +1565,10 @@ function doLogout() {
     fetch(API_URL + '/auth/logout', { method: 'POST', headers: _authHeaders() }).catch(function(){});
   }
   _setToken(null);
-  currentUser = null;
+currentUser = null;
+db.cards = []; db.clients = [];
+db.users = [{ id:'U001', name:'Administrador TBC', username:'admin', password:ADMIN_DEFAULT_HASH, email:'admin@tbc.com.br', role:'admin', active:true, color:'#b87333', forcePwdChange:true }];
+db.nextCardId = 1; db.nextUserId = 2; db.nextClientId = 1;
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   document.getElementById('client-portal').style.display = 'none';
