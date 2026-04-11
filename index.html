@@ -1469,7 +1469,10 @@ function _doLoginLocal(u, p, errEl) {
   errEl.textContent = '';
   document.getElementById('login-screen').style.display = 'none';
   if (user.forcePwdChange) { openForcePasswordChange(user); return; }
-  if (user.role === 'cliente') { showClientPortal(user); } else { showApp(user); }
+  // Mesmo no login local, carrega banco remoto e inicia polling
+  loadDBRemote(function() {
+    if (user.role === 'cliente') { showClientPortal(currentUser); } else { showApp(currentUser); }
+  });
 }
 
 function doLogin() {
