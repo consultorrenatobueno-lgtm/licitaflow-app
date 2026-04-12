@@ -2024,8 +2024,8 @@ function portalAddAttachment(cardId, input) {
   var pending = files.length;
   if (!pending) return;
   files.forEach(function(file) {
-    if (file.size > 2 * 1024 * 1024) {
-      toast('"'+file.name+'" excede 2 MB e foi ignorado.', 'warning');
+    if (file.size > 10 * 1024 * 1024) {
+      toast('"'+file.name+'" excede 10 MB e foi ignorado.', 'warning');
       pending--;
       if (pending === 0) { saveDB(); showClientPortal(currentUser); }
       return;
@@ -2362,8 +2362,8 @@ function portalAddHabDoc(clientId, input) {
   var pending = files.length;
   if (!pending) return;
   files.forEach(function(file) {
-    if (file.size > 3 * 1024 * 1024) {
-      toast('"'+file.name+'" excede 3 MB e foi ignorado.', 'warning');
+    if (file.size > 10 * 1024 * 1024) {
+      toast('"'+file.name+'" excede 10 MB e foi ignorado.', 'warning');
       pending--;
       if (pending === 0) { saveDB(); showClientPortal(currentUser); }
       return;
@@ -2867,9 +2867,9 @@ function addAttachments(cardId, input) {
   var pending = files.length;
   if (!pending) return;
   files.forEach(function(file) {
-    // Verificar tamanho (max 2MB por arquivo para não estourar localStorage)
-    if (file.size > 2 * 1024 * 1024) {
-      toast('"'+file.name+'" excede 2 MB e foi ignorado.','warning');
+    // Verificar tamanho (max 10MB por arquivo)
+    if (file.size > 10 * 1024 * 1024) {
+      toast('"'+file.name+'" excede 10 MB e foi ignorado.','warning');
       pending--;
       if (pending === 0) { saveDB(); render(); openDetailModal(cardId); }
       return;
@@ -3581,8 +3581,8 @@ function addHabDocs(input) {
   if (!pending) return;
   if (!window._habDocsArr) window._habDocsArr = [];
   files.forEach(function(file){
-    if (file.size > 3 * 1024 * 1024) {
-      toast('"'+file.name+'" excede 3 MB e foi ignorado.','warning');
+    if (file.size > 10 * 1024 * 1024) {
+      toast('"'+file.name+'" excede 10 MB e foi ignorado.','warning');
       pending--;
       if (pending===0) refreshHabDocsList();
       return;
