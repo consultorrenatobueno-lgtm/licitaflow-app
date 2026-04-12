@@ -798,7 +798,7 @@ tbody tr:hover td { background: #faf9f7; }
     <div style="margin-top:14px;text-align:center">
       <button onclick="openRecoverAdmin()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--silver2);text-decoration:underline;font-family:'IBM Plex Sans',sans-serif">Problemas para entrar?</button>
     </div>
-    <div style="margin-top:10px;text-align:center;font-size:10px;color:var(--silver);letter-spacing:0.5px">TBC LicitaFlow v20 · Thor Business Consulting</div>
+    <div style="margin-top:10px;text-align:center;font-size:10px;color:var(--silver);letter-spacing:0.5px">TBC LicitaFlow v21 · Thor Business Consulting</div>
   </div>
 </div>
 
@@ -1254,9 +1254,27 @@ function _stopPolling() {
   _lastRemoteHash = null;
 }
 
+// Cria uma cópia leve do DB sem os dados base64 dos anexos (para o localStorage)
+function _dbLightCopy() {
+  try {
+    var light = JSON.parse(JSON.stringify(db));
+    light.cards.forEach(function(c) {
+      if (c.attachments) c.attachments = c.attachments.map(function(a) {
+        return { name: a.name, size: a.size, type: a.type }; // sem 'data'
+      });
+    });
+    if (light.clients) light.clients.forEach(function(cl) {
+      if (cl.habDocs) cl.habDocs = cl.habDocs.map(function(d) {
+        return { name: d.name, size: d.size, type: d.type }; // sem 'data'
+      });
+    });
+    return light;
+  } catch(e) { return db; }
+}
+
 function saveDB() {
-  // Salva localmente imediatamente
-  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+  // Salva localmente SEM os base64 (economiza localStorage)
+  try { localStorage.setItem(DB_KEY, JSON.stringify(_dbLightCopy())); } catch(e) {}
   // Reler token do localStorage para garantir que está atualizado
   var tok = null;
   try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
@@ -1711,14 +1729,7 @@ function showApp(user) {
 // ═══════════════════════════════════════════════════════
 
 function showClientPortal(user) {
-  var client = db.clients.find(function(c){ 
-  return c.email && user.email && 
-         c.email.toLowerCase().trim() === user.email.toLowerCase().trim(); 
-}) || db.clients.find(function(c){
-  // fallback: busca pelo username do usuário (caso e-mail não bata)
-  return c.email && user.username && 
-         c.email.toLowerCase().trim() === user.username.toLowerCase().trim();
-});
+  var client = db.clients.find(function(c){ return c.email === user.email; });
   var allCards = db.cards.filter(function(c){ return c.clienteId && client && c.clienteId === client.id; });
 
   // Active: not yet in resultado col, or in resultado but approved via nomeacao (still showing)
@@ -2428,7 +2439,7 @@ function renderStorageIndicator() {
   var el = document.getElementById('storage-indicator');
   if (!el) return;
   var used = getStorageUsage();
-  var limit = 5 * 1024 * 1024; // 5MB típico
+  var limit = 25 * 1024 * 1024; // 25MB — Neon suporta muito mais que localStorage
   var pct = Math.min(100, Math.round(used / limit * 100));
   var color = pct < 60 ? 'var(--green)' : pct < 85 ? 'var(--gold)' : 'var(--red)';
   var cards = db.cards.length;
@@ -2437,13 +2448,13 @@ function renderStorageIndicator() {
   db.clients.forEach(function(c){ (c.habDocs||[]).forEach(function(d){ attSize += (d.size||0); }); });
   el.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">'
     +'<div style="font-size:12px;font-weight:600;color:var(--steel)">Armazenamento — Neon PostgreSQL (Render)</div>'
-    +'<div style="font-size:11px;color:var(--silver2)">~'+formatStorageSize(used)+' em memória ('+pct+'% do ref. local)'
+    +'<div style="font-size:11px;color:var(--silver2)">~'+formatStorageSize(used)+' total ('+pct+'% do ref. Neon)'
     +(attSize>0?' · Anexos: '+formatStorageSize(attSize):'')+'</div>'
     +'</div>'
     +'<div style="height:6px;background:var(--off);border-radius:3px;overflow:hidden">'
     +'<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:3px;transition:width 0.4s"></div>'
     +'</div>'
-    +(pct>85?'<div style="margin-top:8px;font-size:11px;color:var(--red)">⚠ Armazenamento quase cheio. Exporte um backup e considere limpar anexos antigos.</div>':'')
+    +(pct>85?'<div style="margin-top:8px;font-size:11px;color:var(--red)">⚠ Volume de dados alto. Considere exportar backup e limpar anexos antigos.</div>':'')
     +'<div style="margin-top:8px;font-size:11px;color:var(--silver2)">'
     +cards+' licitações · '+db.clients.length+' clientes · '+db.users.length+' usuários'
     +'</div>';
@@ -3800,7 +3811,7 @@ function toast(msg, type) {
 document.getElementById('login-user').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
 
 // ── Versão ──
-var APP_VERSION = 'v20';
+var APP_VERSION = 'v21';
 try { console.log('TBC LicitaFlow ' + APP_VERSION + ' — Thor Business Consulting'); } catch(e) {}
 </script>
 </body>
