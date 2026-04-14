@@ -1194,8 +1194,9 @@ function _showSync(msg, color) {
 
 // ── Polling de sincronização ──
 var _pollTimer = null;
-var _pollInterval = 15000;
+var _pollInterval = 60000;
 var _lastRemoteHash = null;
+var _lastRemoteETag = null;
 var _keepAliveTimer = null;
 
 // Keep-alive: faz ping na API a cada 8 minutos para evitar sleep no Render (plano free)
@@ -1204,7 +1205,7 @@ function _startKeepAlive() {
   _keepAliveTimer = setInterval(function() {
     fetch(API_URL + '/db', { method: 'GET', headers: { 'Content-Type': 'application/json' } })
       .catch(function() {});
-  }, 8 * 60 * 1000); // 8 minutos
+  }, 12 * 60 * 1000); // 12 minutos
 }
 _startKeepAlive(); // inicia imediatamente ao carregar a página
 var _saveTimer = null;
@@ -1226,14 +1227,22 @@ function _startPolling() {
   _stopPolling();
   _pollTimer = setInterval(function() {
     if (!_authToken || !currentUser) { _stopPolling(); return; }
-    // Reler token do localStorage para garantir que está atualizado
     var tok = null;
     try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
     if (!tok) { _stopPolling(); return; }
     var ctrl = new AbortController();
-    var fetchTimeout = setTimeout(function(){ ctrl.abort(); }, 60000); // 60s timeout
-    fetch(API_URL + '/db', { headers: { 'Content-Type': 'application/json', 'x-auth-token': tok }, signal: ctrl.signal })
-    .then(function(r) { clearTimeout(fetchTimeout); if (!r.ok) return null; return r.json(); })
+    var fetchTimeout = setTimeout(function(){ ctrl.abort(); }, 60000);
+    var headers = { 'Content-Type': 'application/json', 'x-auth-token': tok };
+    if (_lastRemoteETag) headers['If-None-Match'] = _lastRemoteETag;
+    fetch(API_URL + '/db', { headers: headers, signal: ctrl.signal })
+    .then(function(r) {
+      clearTimeout(fetchTimeout);
+      if (r.status === 304) return null; // nada mudou
+      if (!r.ok) return null;
+      var etag = r.headers.get('ETag') || r.headers.get('etag');
+      if (etag) _lastRemoteETag = etag;
+      return r.json();
+    })
     .then(function(data) {
       if (!data || (!data.cards && !data.users)) return;
       var h = _hashDB(data);
