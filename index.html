@@ -3370,69 +3370,7 @@ function renderRelatorio() {
       +'</tr>';
   }).join('');
 }
-  var tbody = document.getElementById('relatorio-table-body');
-  var statsEl = document.getElementById('relatorio-stats');
-  if (!tbody) return;
-  var q = ((document.getElementById('relatorioSearch')||{}).value||'').toLowerCase();
-  var filtroRes = ((document.getElementById('relatorioFiltroResultado')||{}).value||'').toLowerCase();
-  var archived = db.cards.filter(function(c){
-    if (!c.arquivado) return false;
-    if (q && !(c.title||'').toLowerCase().includes(q) && !(c.entity||'').toLowerCase().includes(q)
-      && !(c.id||'').toLowerCase().includes(q) && !(c.resultado||'').toLowerCase().includes(q)) return false;
-    if (filtroRes) {
-      var rp = c.respostaPregao;
-      var res = '';
-      if (rp && rp.status) {
-        var map = {ganha:'Licitação Ganha', perdida:'Licitação Perdida', desabilitada:'Licitação Desabilitada'};
-        res = (map[rp.status]||'').toLowerCase();
-      } else if (c.resultado) {
-        res = c.resultado.toLowerCase();
-      }
-      if (res !== filtroRes) return false;
-    }
-    return true;
-  });
-  var total = archived.length;
-  var ganhas  = archived.filter(function(c){ return (c.respostaPregao&&c.respostaPregao.status==='ganha')||(c.resultado==='Licitação Ganha'); }).length;
-  var perdidas = archived.filter(function(c){ return (c.respostaPregao&&c.respostaPregao.status==='perdida')||(c.resultado==='Licitação Perdida'); }).length;
-  var valorTotal = archived.reduce(function(acc,c){ return acc+((c.respostaPregao&&c.respostaPregao.valorGanho)||0); }, 0);
-  if (statsEl) {
-    statsEl.innerHTML = [
-      { dot:'var(--silver2)', count:total,   label:'Total Arquivadas' },
-      { dot:'var(--green)',   count:ganhas,  label:'Ganhas' },
-      { dot:'var(--red)',     count:perdidas, label:'Perdidas' },
-    ].map(function(s){
-      return '<div class="stat-pill"><div class="dot" style="background:'+s.dot+'"></div><span class="count">'+s.count+'</span><span class="label">'+s.label+'</span></div>';
-    }).join('') + (valorTotal>0?'<div class="stats-total">Ganhos: '+fmt(valorTotal)+'</div>':'');
-  }
-  if (!archived.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--silver);padding:32px">Nenhuma licitação finalizada ainda.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = archived.map(function(c){
-    var rp = c.respostaPregao;
-    var outcomeLabel = c.resultado||'—';
-    var outcomeCss = resultadoCss(c.resultado||'');
-    var valorFinal = '—';
-    if (rp) {
-      if (rp.status==='ganha')        { outcomeLabel='Licitação Ganha'; outcomeCss='ganhou'; valorFinal=fmt(rp.valorGanho||0); }
-      if (rp.status==='perdida')      { outcomeLabel='Licitação Perdida'; outcomeCss='perdeu'; valorFinal=fmt(rp.valorProposta||0)+(rp.concorrente?' ('+escapeHtml(rp.concorrente)+')':''); }
-      if (rp.status==='desabilitada') { outcomeLabel='Licitação Desabilitada'; outcomeCss='cancelado'; }
-    }
-    return '<tr>'
-      +'<td style="font-family:IBM Plex Mono,monospace;font-size:11px;white-space:nowrap">'+c.id+'</td>'
-      +'<td><div style="font-weight:600;font-size:13px">'+escapeHtml(c.title)+'</div>'+(c.dataArquivamento?'<div style="font-size:10px;color:var(--silver2)">Arquivado: '+c.dataArquivamento+'</div>':'')+'</td>'
-      +'<td style="font-size:12px">'+escapeHtml(c.entity)+'</td>'
-      +'<td style="font-size:11px">'+c.modalidade+'</td>'
-      +'<td style="font-size:12px">'+clientName(c.clienteId)+'</td>'
-      +'<td><span class="tag tag-'+outcomeCss+'" style="white-space:nowrap">'+outcomeLabel+'</span></td>'
-      +'<td style="font-family:IBM Plex Mono,monospace;font-size:12px;white-space:nowrap">'+valorFinal+'</td>'
-      +'<td style="font-size:11px;white-space:nowrap">'+fmtDate(c.dataAbertura)+'</td>'
-      +'<td><div class="action-btns"><button class="btn btn-ghost btn-sm" onclick="desarquivarCard(\''+c.id+'\')">↩ Reabrir</button></div></td>'
-      +'</tr>';
-  }).join('');
-}
-
+  
 function exportRelatorioCSV() {
   var archived = db.cards.slice(); // Exporta TODAS as licitações (ativas + arquivadas)
   if (!archived.length) { toast('Nenhuma licitação arquivada para exportar.', 'info'); return; }
