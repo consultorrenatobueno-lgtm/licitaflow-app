@@ -1973,10 +1973,11 @@ function showClientPortal(user) {
         if (m) { outcomeCor = m.cor; outcomeLabel = m.label; outcomeIcon = m.icon; }
       } else if (card.resultado) {
         var legacyMap = {
-          'Licitação Ganha':        { cor:'var(--green)', icon:'🏆' },
-          'Licitação Perdida':      { cor:'var(--red)',   icon:'✕'  },
-          'Licitação Desabilitada': { cor:'var(--silver2)', icon:'⊘' }
-        };
+  'Licitação Ganha':                  { cor:'var(--green)',   icon:'🏆' },
+  'Licitação Perdida':                { cor:'var(--red)',     icon:'✕'  },
+  'Licitação Desabilitada':           { cor:'var(--silver2)', icon:'⊘'  },
+  'Licitação Rejeitada pelo Cliente': { cor:'var(--red)',     icon:'✕'  }
+};
         var lm = legacyMap[card.resultado];
         if (lm) { outcomeCor = lm.cor; outcomeLabel = card.resultado; outcomeIcon = lm.icon; }
       }
