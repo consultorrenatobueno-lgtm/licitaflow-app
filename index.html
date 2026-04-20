@@ -1001,6 +1001,7 @@ tbody tr:hover td { background: #faf9f7; }
           <option value="Licitação Ganha">Licitação Ganha</option>
           <option value="Licitação Perdida">Licitação Perdida</option>
           <option value="Licitação Desabilitada">Licitação Desabilitada</option>
+          <option value="Licitação Rejeitada pelo Cliente">Rejeitada pelo Cliente</option>
         </select>
         <button class="btn btn-ghost btn-sm" onclick="exportRelatorioCSV()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
@@ -1077,7 +1078,8 @@ var RESULTADO_LABEL = {
   'Licitação Perdida':   'Licitação Perdida',
   'Licitação Desabilitada': 'Licitação Desabilitada',
   'Licitação Suspensa':  'Licitação Suspensa',
-  'Licitação em Aberto': 'Licitação em Aberto'
+  'Licitação em Aberto': 'Licitação em Aberto',
+'Licitação Rejeitada pelo Cliente': 'Licitação Rejeitada pelo Cliente'
 };
 // Mapa: label → CSS class
 var RESULTADO_CSS = {
@@ -1089,7 +1091,8 @@ var RESULTADO_CSS = {
   'Ganhou':  'ganhou',
   'Perdeu':  'perdeu',
   'Deserto': 'deserto',
-  'Cancelado': 'cancelado'
+ 'Cancelado': 'cancelado',
+'Licitação Rejeitada pelo Cliente': 'perdeu'
 };
 function resultadoLabel(r) { return r ? (RESULTADO_LABEL[r] || r) : ''; }
 function resultadoCss(r)   { return r ? (RESULTADO_CSS[r]   || r.toLowerCase().replace(/ /g,'-')) : ''; }
@@ -2344,14 +2347,20 @@ function confirmarRejeitar(cardId) {
   }
   var card = db.cards.find(function(c){ return c.id === cardId; });
   if (!card) return;
-  card.respostaNomeacao = {
-    status: 'rejeitado',
-    motivo: motivo,
-    dataResposta: new Date().toLocaleDateString('pt-BR')
-  };
-  saveDB();
-  document.querySelector('.portal-modal-overlay').remove();
-  showClientPortal(currentUser);
+ card.respostaNomeacao = {
+  status: 'rejeitado',
+  motivo: motivo,
+  dataResposta: new Date().toLocaleDateString('pt-BR')
+};
+// Auto-arquivamento: rejeição pelo cliente → sai do Kanban → vai para Relatório
+card.col = 'resultado';
+card.resultado = 'Licitação Rejeitada pelo Cliente';
+card.arquivado = true;
+card.dataArquivamento = new Date().toLocaleDateString('pt-BR');
+saveDB();
+render();
+document.querySelector('.portal-modal-overlay').remove();
+showClientPortal(currentUser);
 }
 
 function portalDownloadHab(clientId, idx) {
