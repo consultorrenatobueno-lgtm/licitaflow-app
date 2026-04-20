@@ -2808,10 +2808,22 @@ function openDetailModal(cardId) {
           : '<div class="detail-item" style="margin-top:8px"><div class="detail-item-label">Resp. Nomeação</div><div class="detail-item-value"><span class="tag tag-perdeu">✕ Rejeitado</span></div></div>'
             +'<div class="detail-item"><div class="detail-item-label">Motivo</div><div class="detail-item-value" style="color:var(--red)">'+escapeHtml(card.respostaNomeacao.motivo||'—')+'</div></div>'
             +(card.respostaNomeacao.dataResposta?'<div class="detail-item"><div class="detail-item-label">Data Resposta</div><div class="detail-item-value">'+card.respostaNomeacao.dataResposta+'</div></div>':'')
-        )
-      : (card.clienteId ? '<div style="font-size:11px;color:var(--silver2);margin-top:6px;padding:6px 0">⏳ Aguardando resposta do participante.</div>' : '')
-    )
-    +(card.respostaPregao && card.respostaPregao.status
+      )
+  : (card.clienteId ? '<div style="font-size:11px;color:var(--silver2);margin-top:6px;padding:6px 0">⏳ Aguardando resposta do participante.</div>' : '')
+)
++(card.notificacoes && card.notificacoes.length > 0
+  ? '<div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(45,111,163,0.06);border:1px solid rgba(45,111,163,0.15)">'
+    + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--blue);margin-bottom:6px">Histórico de Notificações</div>'
+    + card.notificacoes.map(function(n,i){
+        return '<div style="font-size:11px;color:var(--steel2);padding:3px 0;border-bottom:1px solid rgba(45,111,163,0.08)">'
+          +'<span style="font-family:IBM Plex Mono,monospace;color:var(--silver2)">#'+(i+1)+'</span>'
+          +' &nbsp;'+n.data+' às '+n.hora
+          +' &nbsp;·&nbsp; <span style="color:var(--steel)">'+escapeHtml(n.usuario)+'</span>'
+          +'</div>';
+      }).join('')
+    +'</div>'
+  : '')
++(card.respostaPregao && card.respostaPregao.status
       ? (function(){
           var rp = card.respostaPregao;
           var labelRes = {ganha:'🏆 Licitação Ganha', perdida:'✕ Licitação Perdida', desabilitada:'⊘ Licitação Desabilitada', suspensa:'⏸ Licitação Suspensa', aberta:'📋 Licitação em Aberto'}[rp.status]||rp.status;
