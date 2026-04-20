@@ -997,12 +997,14 @@ tbody tr:hover td { background: #faf9f7; }
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" class="form-input" style="max-width:240px" placeholder="Buscar licitação..." id="relatorioSearch" oninput="renderRelatorio()">
         <select class="form-select" id="relatorioFiltroResultado" style="max-width:220px" onchange="renderRelatorio()">
-          <option value="">Todos os resultados</option>
+<option value="">Todas as licitações</option>
+          <option value="__ativas__">▶ Em andamento (Kanban)</option>
+          <option value="__arquivadas__">✓ Finalizadas / Arquivadas</option>
           <option value="Licitação Ganha">Licitação Ganha</option>
           <option value="Licitação Perdida">Licitação Perdida</option>
           <option value="Licitação Desabilitada">Licitação Desabilitada</option>
           <option value="Licitação Rejeitada pelo Cliente">Rejeitada pelo Cliente</option>
-        </select>
+          </select>
         <button class="btn btn-ghost btn-sm" onclick="exportRelatorioCSV()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
           Exportar CSV
@@ -1015,8 +1017,9 @@ tbody tr:hover td { background: #faf9f7; }
         <table>
           <thead>
             <tr>
-              <th>ID</th><th>Licitação</th><th>Órgão</th><th>Modalidade</th>
-              <th>Participante</th><th>Resultado</th><th>Valor Final</th><th>Abertura</th><th>Ações</th>
+              <th>ID</th><th>Licitação / Órgão</th><th>Modalidade</th>
+              <th>Etapa / Status</th><th>Participante</th><th>Nomeação</th>
+              <th>Valor Est.</th><th>Valor Final</th><th>Abertura</th><th>Ações</th>
             </tr>
           </thead>
           <tbody id="relatorio-table-body"></tbody>
@@ -3254,6 +3257,122 @@ function renderRelatorio() {
   var tbody = document.getElementById('relatorio-table-body');
   var statsEl = document.getElementById('relatorio-stats');
   if (!tbody) return;
+
+  var q = ((document.getElementById('relatorioSearch')||{}).value||'').toLowerCase();
+  var filtroRes = ((document.getElementById('relatorioFiltroResultado')||{}).value||'');
+
+  // Todas as licitações — ativas + arquivadas
+  var todas = db.cards.filter(function(c) {
+    if (q && !(c.title||'').toLowerCase().includes(q)
+          && !(c.entity||'').toLowerCase().includes(q)
+          && !(c.id||'').toLowerCase().includes(q)
+          && !(c.resultado||'').toLowerCase().includes(q)) return false;
+    if (filtroRes === '__ativas__')     return !c.arquivado;
+    if (filtroRes === '__arquivadas__') return !!c.arquivado;
+    if (filtroRes) {
+      var res = c.resultado || '';
+      if (res.toLowerCase() !== filtroRes.toLowerCase()) return false;
+    }
+    return true;
+  });
+
+  // Stats gerais (sobre o banco todo)
+  var totalGeral = db.cards.length;
+  var ativas     = db.cards.filter(function(c){ return !c.arquivado; }).length;
+  var arquivadas = db.cards.filter(function(c){ return !!c.arquivado; }).length;
+  var ganhas     = db.cards.filter(function(c){ return (c.respostaPregao&&c.respostaPregao.status==='ganha')||(c.resultado==='Licitação Ganha'); }).length;
+  var valorTotal = db.cards.reduce(function(acc,c){ return acc+((c.respostaPregao&&c.respostaPregao.valorGanho)||0); }, 0);
+
+  if (statsEl) {
+    statsEl.innerHTML = [
+      { dot:'var(--blue)',    count:totalGeral, label:'Total' },
+      { dot:'var(--bronze)',  count:ativas,     label:'Em andamento' },
+      { dot:'var(--silver2)', count:arquivadas, label:'Finalizadas' },
+      { dot:'var(--green)',   count:ganhas,     label:'Ganhas' },
+    ].map(function(s){
+      return '<div class="stat-pill"><div class="dot" style="background:'+s.dot+'"></div>'
+        +'<span class="count">'+s.count+'</span><span class="label">'+s.label+'</span></div>';
+    }).join('') + (valorTotal>0?'<div class="stats-total">Ganhos: '+fmt(valorTotal)+'</div>':'');
+  }
+
+  if (!todas.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--silver);padding:32px">Nenhuma licitação encontrada.</td></tr>';
+    return;
+  }
+
+  // Ordenar: ativas primeiro (por etapa), arquivadas por último
+  var colOrder = { captacao:0, nomeacao:1, pregao:2, resultado:3 };
+  todas.sort(function(a, b) {
+    if (!!a.arquivado !== !!b.arquivado) return a.arquivado ? 1 : -1;
+    return (colOrder[a.col]||0) - (colOrder[b.col]||0);
+  });
+
+  tbody.innerHTML = todas.map(function(c) {
+    var isArquivada = !!c.arquivado;
+    var colColor = COL_COLORS[c.col] || 'var(--silver2)';
+
+    // Coluna Etapa / Status
+    var etapaHtml;
+    if (isArquivada) {
+      var rp = c.respostaPregao;
+      var outcomeLabel = c.resultado || 'Finalizada';
+      var outcomeCss   = resultadoCss(c.resultado || '');
+      if (rp) {
+        if (rp.status==='ganha')        { outcomeLabel='Licitação Ganha';        outcomeCss='ganhou';   }
+        if (rp.status==='perdida')      { outcomeLabel='Licitação Perdida';       outcomeCss='perdeu';   }
+        if (rp.status==='desabilitada') { outcomeLabel='Licitação Desabilitada';  outcomeCss='cancelado';}
+      }
+      etapaHtml = '<span class="tag tag-'+outcomeCss+'" style="white-space:nowrap">'+outcomeLabel+'</span>'
+        +(c.dataArquivamento?'<div style="font-size:10px;color:var(--silver2);margin-top:3px">'+c.dataArquivamento+'</div>':'');
+    } else {
+      etapaHtml = '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:4px;'
+        +'font-size:10px;font-weight:600;background:'+colColor+'18;color:'+colColor+';'
+        +'border:1px solid '+colColor+'33;white-space:nowrap">'
+        +'<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>'
+        +colLabel(c.col)+'</span>';
+    }
+
+    // Valor final
+    var rp2 = c.respostaPregao;
+    var valorFinal = '—';
+    if (rp2 && rp2.status==='ganha')   valorFinal = fmt(rp2.valorGanho||0);
+    if (rp2 && rp2.status==='perdida') valorFinal = fmt(rp2.valorProposta||0);
+
+    // Resposta de Nomeação
+    var nomeacaoHtml = '—';
+    if (c.clienteId) {
+      var rn = c.respostaNomeacao;
+      if (rn && rn.status==='aprovado')
+        nomeacaoHtml = '<span class="tag tag-ganhou" style="font-size:10px">✓ Aprovado</span>';
+      else if (rn && rn.status==='rejeitado')
+        nomeacaoHtml = '<span class="tag tag-perdeu" style="font-size:10px">✕ Rejeitado</span>';
+      else
+        nomeacaoHtml = '<span style="font-size:11px;color:var(--silver2)">⏳ Pendente</span>';
+    }
+
+    return '<tr style="'+(isArquivada?'opacity:0.85':'')+'">'
+      +'<td style="font-family:IBM Plex Mono,monospace;font-size:11px;white-space:nowrap">'+c.id+'</td>'
+      +'<td><div style="font-weight:600;font-size:13px">'+escapeHtml(c.title)+'</div>'
+        +'<div style="font-size:10px;color:var(--silver2)">'+escapeHtml(c.entity)+'</div></td>'
+      +'<td style="font-size:11px">'+c.modalidade+'</td>'
+      +'<td>'+etapaHtml+'</td>'
+      +'<td style="font-size:12px">'+clientName(c.clienteId)+'</td>'
+      +'<td>'+nomeacaoHtml+'</td>'
+      +'<td style="font-family:IBM Plex Mono,monospace;font-size:12px;white-space:nowrap">'+fmt(c.valor)+'</td>'
+      +'<td style="font-family:IBM Plex Mono,monospace;font-size:12px;white-space:nowrap">'+valorFinal+'</td>'
+      +'<td style="font-size:11px;white-space:nowrap">'+fmtDate(c.dataAbertura)+'</td>'
+      +'<td><div class="action-btns">'
+        +(isArquivada
+          ? '<button class="btn btn-ghost btn-sm" onclick="desarquivarCard(\''+c.id+'\')">↩ Reabrir</button>'
+          : '<button class="btn btn-ghost btn-sm" onclick="openDetailModal(\''+c.id+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver</button>'
+        )
+        +'</div></td>'
+      +'</tr>';
+  }).join('');
+}
+  var tbody = document.getElementById('relatorio-table-body');
+  var statsEl = document.getElementById('relatorio-stats');
+  if (!tbody) return;
   var q = ((document.getElementById('relatorioSearch')||{}).value||'').toLowerCase();
   var filtroRes = ((document.getElementById('relatorioFiltroResultado')||{}).value||'').toLowerCase();
   var archived = db.cards.filter(function(c){
@@ -3315,9 +3434,9 @@ function renderRelatorio() {
 }
 
 function exportRelatorioCSV() {
-  var archived = db.cards.filter(function(c){ return c.arquivado; });
+  var archived = db.cards.slice(); // Exporta TODAS as licitações (ativas + arquivadas)
   if (!archived.length) { toast('Nenhuma licitação arquivada para exportar.', 'info'); return; }
-  var rows = [['ID','Título','Órgão/Entidade','Modalidade','Tipo','Participante','Resultado','Valor Estimado','Valor Final','Abertura','Data Arquivamento']];
+  var rows = [['ID','Título','Órgão/Entidade','Modalidade','Tipo','Participante','Etapa','Resultado','Valor Estimado','Valor Final','Abertura','Data Arquivamento']];
   archived.forEach(function(c) {
     var rp = c.respostaPregao;
     var outcome = c.resultado || '';
@@ -3328,8 +3447,8 @@ function exportRelatorioCSV() {
       if (rp.status==='desabilitada') { outcome='Licitação Desabilitada'; }
     }
     rows.push([
-      c.id, c.title, c.entity, c.modalidade, c.tipo,
-      clientName(c.clienteId), outcome, c.valor||'', valorFinal,
+c.id, c.title, c.entity, c.modalidade, c.tipo,
+      clientName(c.clienteId), (c.arquivado?'Finalizada':colLabel(c.col)), outcome, c.valor||'', valorFinal,
       fmtDate(c.dataAbertura), c.dataArquivamento||''
     ]);
   });
