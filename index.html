@@ -2973,13 +2973,69 @@ function formatBytes(bytes) {
 
 // ─── Gera link WhatsApp com mensagem de nomeação ───
 function buildWaLink(cl, card) {
-  var msg = card
-    ? 'Ol\u00e1 '+cl.name+', voc\u00ea foi nomeado(a) como participante na licita\u00e7\u00e3o \u201c'+card.title+'\u201d referente ao \u00f3rg\u00e3o '+card.entity+'. Acesse o sistema TBC LicitaFlow para visualizar o edital. At.te, TBC \u2013 Thor Business Consulting.'
-    : 'Ol\u00e1 '+cl.name+', voc\u00ea foi nomeado(a) em uma licita\u00e7\u00e3o no TBC LicitaFlow. Acesse o sistema para ver os detalhes. At.te, TBC \u2013 Thor Business Consulting.';
-  return '<a href="https://wa.me/55'+cl.whatsapp+'?text='+encodeURIComponent(msg)+'" target="_blank">'
-    +'<button class="btn btn-wa btn-sm"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg> Notificar via WhatsApp</button></a>';
-}
+  if (!cl || !cl.whatsapp) return '';
 
+  var msg;
+  var btnLabel = 'Notificar via WhatsApp';
+  var btnStyle = '';
+
+  if (card) {
+    var jaNotificado = card.notificacoes && card.notificacoes.length > 0;
+    var diasRestantes = card.dataAbertura ? daysUntil(card.dataAbertura) : null;
+
+    if (!jaNotificado) {
+      // Primeira notificação — mensagem de nomeação
+      msg = 'Olá ' + cl.name + ', você foi nomeado(a) como participante na licitação "'
+        + card.title + '" referente ao órgão ' + card.entity
+        + '. Acesse o sistema TBC LicitaFlow para visualizar o edital e confirmar sua participação.'
+        + ' At.te, TBC – Thor Business Consulting.';
+      btnLabel = 'Notificar via WhatsApp';
+    } else {
+      // Notificações seguintes — inclui dias restantes
+      var prazoTxt = '';
+      if (diasRestantes !== null) {
+        if (diasRestantes < 0)       prazoTxt = 'O pregão já ocorreu.';
+        else if (diasRestantes === 0) prazoTxt = 'O pregão é HOJE!';
+        else if (diasRestantes === 1) prazoTxt = 'Falta apenas 1 dia para o pregão!';
+        else                          prazoTxt = 'Faltam ' + diasRestantes + ' dias para o pregão.';
+      }
+      msg = 'Olá ' + cl.name + ', lembramos que você está nomeado(a) na licitação "'
+        + card.title + '" — ' + card.entity + '. '
+        + prazoTxt
+        + (card.dataAbertura ? ' Data de abertura: ' + fmtDate(card.dataAbertura) + '.' : '')
+        + ' Acesse o TBC LicitaFlow para mais detalhes.'
+        + ' At.te, TBC – Thor Business Consulting.';
+      btnLabel = diasRestantes !== null
+        ? (diasRestantes <= 0 ? '🔔 Renotificar (pregão vencido)' : '🔔 Renotificar (' + diasRestantes + ' dias)')
+        : '🔔 Renotificar';
+      btnStyle = 'background:var(--blue);';
+    }
+  } else {
+    msg = 'Olá ' + cl.name + ', você foi nomeado(a) em uma licitação no TBC LicitaFlow.'
+      + ' Acesse o sistema para ver os detalhes. At.te, TBC – Thor Business Consulting.';
+  }
+
+  var href = 'https://wa.me/55' + cl.whatsapp + '?text=' + encodeURIComponent(msg);
+  return '<a href="' + href + '" target="_blank" onclick="registrarNotificacao(\'' + (card ? card.id : '') + '\')">'
+    + '<button class="btn btn-wa btn-sm" style="' + btnStyle + '">'
+    + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>'
+    + ' ' + btnLabel
+    + '</button></a>';
+}
+function registrarNotificacao(cardId) {
+  if (!cardId) return;
+  var card = db.cards.find(function(c){ return c.id === cardId; });
+  if (!card) return;
+  if (!card.notificacoes) card.notificacoes = [];
+  card.notificacoes.push({
+    data: new Date().toLocaleDateString('pt-BR'),
+    hora: new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}),
+    usuario: currentUser ? currentUser.name : 'Sistema'
+  });
+  saveDB();
+  // Reabrir o modal de detalhe para atualizar o botão
+  setTimeout(function(){ openDetailModal(cardId); }, 300);
+}
 // ─── Modal de Edição Completo ───
 function openEditModal(cardId) {
   closeAllModals();
