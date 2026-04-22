@@ -2503,7 +2503,7 @@ function canEdit() { return currentUser && (currentUser.role==='admin'||currentU
 // RENDER APP
 // ═══════════════════════════════════════════════════════
 
-renderStats(); renderBoard(); renderClientsTable(); renderUsersTable(); renderPolicyTable(); renderRelatorio(); renderStorageIndicator(); renderDashboard(); }
+function render() { renderStats(); renderBoard(); renderClientsTable(); renderUsersTable(); renderPolicyTable(); renderRelatorio(); renderStorageIndicator(); renderDashboard(); }
 
 function renderStorageIndicator() {
   var el = document.getElementById('storage-indicator');
