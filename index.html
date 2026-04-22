@@ -4041,8 +4041,12 @@ function renderDashboard() {
   var clienteId = (document.getElementById('dash_cliente')||{}).value || '';
 
   // Cards elegíveis: arquivados (finalizados) + Rejeitada pelo Cliente
-  var cards = db.cards.filter(function(c) {
-    var elegivel = c.arquivado || c.resultado === 'Licitação Rejeitada pelo Cliente';
+var cards = db.cards.filter(function(c) {
+    var elegivel = c.arquivado 
+      || c.resultado === 'Licitação Rejeitada pelo Cliente'
+      || c.resultado === 'Licitação Ganha'
+      || c.resultado === 'Licitação Perdida'
+      || c.resultado === 'Licitação Desabilitada';
     if (!elegivel) return false;
     if (clienteId && c.clienteId !== clienteId) return false;
     // Filtro de período por dataAbertura
