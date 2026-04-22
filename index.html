@@ -3432,9 +3432,10 @@ function renderRelatorio() {
       +'<td style="font-size:11px;white-space:nowrap">'+fmtDate(c.dataAbertura)+'</td>'
       +'<td><div class="action-btns">'
         +(isArquivada
-          ? '<button class="btn btn-ghost btn-sm" onclick="desarquivarCard(\''+c.id+'\')">↩ Reabrir</button>'
-          : '<button class="btn btn-ghost btn-sm" onclick="openDetailModal(\''+c.id+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver</button>'
-        )
+  ? '<button class="btn btn-ghost btn-sm" onclick="openDetailModal(\''+c.id+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="desarquivarCard(\''+c.id+'\')">↩ Reabrir</button>'
+  : '<button class="btn btn-ghost btn-sm" onclick="openDetailModal(\''+c.id+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver</button>'
+)
         +'</div></td>'
       +'</tr>';
   }).join('');
