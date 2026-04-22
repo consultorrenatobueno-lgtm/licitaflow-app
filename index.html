@@ -845,6 +845,10 @@ tbody tr:hover td { background: #faf9f7; }
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Relatório
       </button>
+       <button class="nav-tab" data-section="dashboard" onclick="showSection('dashboard')" id="tab-dashboard">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="9" height="9"/><rect x="13" y="2" width="9" height="9"/><rect x="2" y="13" width="9" height="9"/><rect x="13" y="13" width="9" height="9"/></svg>
+  Dashboard
+</button>
     </div>
 
     <div class="header-right">
@@ -1029,7 +1033,51 @@ tbody tr:hover td { background: #faf9f7; }
   </div>
 </div>
 
-<div class="toast-container" id="toastContainer"></div>
+<!-- DASHBOARD -->
+<div class="section" id="section-dashboard">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Dashboard</div>
+      <div class="page-subtitle">Análise de valores por período e participante</div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:24px;padding:16px 20px;background:var(--white);border:1.5px solid #e0ddd8;border-radius:var(--radius);box-shadow:var(--shadow)">
+    <div class="form-group" style="margin:0">
+      <div class="form-label">Data Início</div>
+      <input class="form-input" type="date" id="dash_data_ini" style="max-width:160px" onchange="renderDashboard()">
+    </div>
+    <div class="form-group" style="margin:0">
+      <div class="form-label">Data Final</div>
+      <input class="form-input" type="date" id="dash_data_fim" style="max-width:160px" onchange="renderDashboard()">
+    </div>
+    <div class="form-group" style="margin:0">
+      <div class="form-label">Cliente</div>
+      <select class="form-select" id="dash_cliente" style="max-width:220px" onchange="renderDashboard()">
+        <option value="">Todos os clientes</option>
+      </select>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="dashLimparFiltros()">Limpar filtros</button>
+  </div>
+
+  <!-- Cards de totais -->
+  <div id="dash_totais" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px"></div>
+
+  <!-- Gráficos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex-wrap:wrap" id="dash_graficos">
+    <div style="background:var(--white);border:1.5px solid #e0ddd8;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--steel);margin-bottom:4px">Captado vs Ganho</div>
+      <div style="font-size:11px;color:var(--silver2);margin-bottom:16px">Valor estimado captado × valor efetivamente ganho</div>
+      <div id="dash_pizza1" style="display:flex;flex-direction:column;align-items:center"></div>
+    </div>
+    <div style="background:var(--white);border:1.5px solid #e0ddd8;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--steel);margin-bottom:4px">Resultados das Licitações</div>
+      <div style="font-size:11px;color:var(--silver2);margin-bottom:16px">Distribuição por tipo de resultado</div>
+      <div id="dash_pizza2" style="display:flex;flex-direction:column;align-items:center"></div>
+    </div>
+  </div>
+</div><div class="toast-container" id="toastContainer"></div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -2455,7 +2503,7 @@ function canEdit() { return currentUser && (currentUser.role==='admin'||currentU
 // RENDER APP
 // ═══════════════════════════════════════════════════════
 
-function render() { renderStats(); renderBoard(); renderClientsTable(); renderUsersTable(); renderPolicyTable(); renderRelatorio(); renderStorageIndicator(); }
+renderStats(); renderBoard(); renderClientsTable(); renderUsersTable(); renderPolicyTable(); renderRelatorio(); renderStorageIndicator(); renderDashboard(); }
 
 function renderStorageIndicator() {
   var el = document.getElementById('storage-indicator');
@@ -3958,6 +4006,159 @@ document.getElementById('login-user').addEventListener('keydown', function(e){ i
 // ── Versão ──
 var APP_VERSION = 'v21';
 try { console.log('TBC LicitaFlow ' + APP_VERSION + ' — Thor Business Consulting'); } catch(e) {}
-</script>
+// ═══════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════
+
+function dashPopularClientes() {
+  var sel = document.getElementById('dash_cliente');
+  if (!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '<option value="">Todos os clientes</option>';
+  db.clients.filter(function(c){ return c.active; }).forEach(function(c){
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name + ' (' + c.company + ')';
+    if (c.id === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function dashLimparFiltros() {
+  var ini = document.getElementById('dash_data_ini');
+  var fim = document.getElementById('dash_data_fim');
+  var cli = document.getElementById('dash_cliente');
+  if (ini) ini.value = '';
+  if (fim) fim.value = '';
+  if (cli) cli.value = '';
+  renderDashboard();
+}
+
+function renderDashboard() {
+  dashPopularClientes();
+  var dataIni = (document.getElementById('dash_data_ini')||{}).value || '';
+  var dataFim = (document.getElementById('dash_data_fim')||{}).value || '';
+  var clienteId = (document.getElementById('dash_cliente')||{}).value || '';
+
+  // Cards elegíveis: arquivados (finalizados) + Rejeitada pelo Cliente
+  var cards = db.cards.filter(function(c) {
+    var elegivel = c.arquivado || c.resultado === 'Licitação Rejeitada pelo Cliente';
+    if (!elegivel) return false;
+    if (clienteId && c.clienteId !== clienteId) return false;
+    // Filtro de período por dataAbertura
+    if (dataIni && c.dataAbertura && c.dataAbertura < dataIni) return false;
+    if (dataFim && c.dataAbertura && c.dataAbertura > dataFim) return false;
+    return true;
+  });
+
+  // Métricas
+  var totalCaptado = cards.reduce(function(acc, c){ return acc + (c.valor || 0); }, 0);
+  var totalGanho   = cards.filter(function(c){ return c.resultado === 'Licitação Ganha'; })
+                          .reduce(function(acc, c){ return acc + ((c.respostaPregao && c.respostaPregao.valorGanho) || 0); }, 0);
+  var totalPerdido = cards.filter(function(c){ return c.resultado === 'Licitação Perdida'; }).length;
+  var totalDesab   = cards.filter(function(c){ return c.resultado === 'Licitação Desabilitada'; }).length;
+  var totalRej     = cards.filter(function(c){ return c.resultado === 'Licitação Rejeitada pelo Cliente'; }).length;
+  var totalGanhas  = cards.filter(function(c){ return c.resultado === 'Licitação Ganha'; }).length;
+
+  // Cards de totais
+  var totaisEl = document.getElementById('dash_totais');
+  if (totaisEl) {
+    totaisEl.innerHTML = [
+      { label:'Total Captado',  val:fmt(totalCaptado), color:'var(--bronze)', icon:'📥' },
+      { label:'Total Ganho',    val:fmt(totalGanho),   color:'var(--green)',  icon:'🏆' },
+      { label:'Licitações',     val:cards.length,      color:'var(--blue)',   icon:'📋' },
+      { label:'Ganhas',         val:totalGanhas,       color:'var(--green)',  icon:'✓'  },
+      { label:'Perdidas',       val:totalPerdido,      color:'var(--red)',    icon:'✕'  },
+      { label:'Desabilitadas',  val:totalDesab,        color:'var(--silver2)',icon:'⊘'  },
+      { label:'Rejeitadas',     val:totalRej,          color:'var(--orange)', icon:'↩'  },
+    ].map(function(s){
+      return '<div style="background:var(--white);border:1.5px solid #e0ddd8;border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)">'
+        +'<div style="font-size:20px;margin-bottom:6px">'+s.icon+'</div>'
+        +'<div style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--silver2);margin-bottom:4px">'+s.label+'</div>'
+        +'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:18px;font-weight:700;color:'+s.color+'">'+s.val+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  // ── Pizza 1: Captado vs Ganho ──
+  var p1Data = [
+    { label:'Captado', val:totalCaptado, color:'#b87333' },
+    { label:'Ganho',   val:totalGanho,   color:'#2e7d52' },
+  ];
+  renderPizza('dash_pizza1', p1Data, true);
+
+  // ── Pizza 2: Resultados ──
+  var p2Data = [
+    { label:'Ganho',        val:totalGanhas,  color:'#2e7d52' },
+    { label:'Perdido',      val:totalPerdido, color:'#c0392b' },
+    { label:'Desabilitado', val:totalDesab,   color:'#8b929a' },
+    { label:'Rejeitado',    val:totalRej,     color:'#d35400' },
+  ].filter(function(d){ return d.val > 0; });
+  renderPizza('dash_pizza2', p2Data, false);
+}
+
+function renderPizza(elId, data, showCurrency) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+
+  var total = data.reduce(function(acc, d){ return acc + d.val; }, 0);
+
+  if (!total) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--silver);font-size:13px">Sem dados para o período.</div>';
+    return;
+  }
+
+  var size = 200;
+  var cx = size / 2, cy = size / 2, r = 80, rInner = 44;
+  var startAngle = -Math.PI / 2;
+  var paths = '';
+  var legendHtml = '';
+
+  data.forEach(function(d) {
+    var pct = d.val / total;
+    var angle = pct * 2 * Math.PI;
+    var endAngle = startAngle + angle;
+    var largeArc = angle > Math.PI ? 1 : 0;
+
+    var x1o = cx + r * Math.cos(startAngle);
+    var y1o = cy + r * Math.sin(startAngle);
+    var x2o = cx + r * Math.cos(endAngle);
+    var y2o = cy + r * Math.sin(endAngle);
+    var x1i = cx + rInner * Math.cos(endAngle);
+    var y1i = cy + rInner * Math.sin(endAngle);
+    var x2i = cx + rInner * Math.cos(startAngle);
+    var y2i = cy + rInner * Math.sin(startAngle);
+
+    // Label no meio da fatia
+    var midAngle = startAngle + angle / 2;
+    var labelR = (r + rInner) / 2;
+    var lx = cx + labelR * Math.cos(midAngle);
+    var ly = cy + labelR * Math.sin(midAngle);
+    var pctStr = (pct * 100).toFixed(1) + '%';
+
+    paths += '<path d="M '+x1o+' '+y1o+' A '+r+' '+r+' 0 '+largeArc+' 1 '+x2o+' '+y2o
+      +' L '+x1i+' '+y1i+' A '+rInner+' '+rInner+' 0 '+largeArc+' 0 '+x2i+' '+y2i+' Z"'
+      +' fill="'+d.color+'" opacity="0.92" stroke="white" stroke-width="2"/>';
+
+    // Mostrar % somente se fatia grande o suficiente
+    if (pct > 0.07) {
+      paths += '<text x="'+lx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="middle"'
+        +' font-size="10" font-weight="700" fill="white" font-family="IBM Plex Mono,monospace">'+pctStr+'</text>';
+    }
+
+    var valStr = showCurrency ? fmt(d.val) : d.val + ' licit.';
+    legendHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<div style="width:12px;height:12px;border-radius:3px;background:'+d.color+';flex-shrink:0"></div>'
+      +'<div style="flex:1;font-size:12px;color:var(--steel)">'+d.label+'</div>'
+      +'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;font-weight:600;color:var(--steel2)">'+valStr+'</div>'
+      +'<div style="font-size:11px;color:var(--silver2);min-width:38px;text-align:right">'+(d.val/total*100).toFixed(1)+'%</div>'
+      +'</div>';
+
+    startAngle = endAngle;
+  });
+
+  el.innerHTML = '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'+paths+'</svg>'
+    +'<div style="width:100%;max-width:260px;margin-top:16px">'+legendHtml+'</div>';
+}</script>
 </body>
 </html>
