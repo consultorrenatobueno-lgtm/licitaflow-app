@@ -817,6 +817,22 @@ tbody tr:hover td { background: #faf9f7; }
   <div class="portal-hero" id="portal-content"></div>
 </div>
 
+<!-- ════ CLIENT PORTAL — HISTÓRICO DE PARTICIPAÇÕES ════ -->
+<div id="client-portal-historico" style="display:none">
+  <div class="portal-header">
+    <img id="portal-historico-logo-img" src="" alt="TBC Logo" style="width:42px;height:42px;object-fit:contain;border-radius:8px;flex-shrink:0;">
+    <div>
+      <div style="font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;color:var(--steel)">TBC <span style="color:var(--bronze)">Licitações</span></div>
+      <div style="font-size:11px;color:var(--silver2)">Histórico de Participações</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="hidePortalHistorico()">← Voltar</button>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sair</button>
+    </div>
+  </div>
+  <div class="portal-hero" id="portal-historico-content"></div>
+</div>
+
 <!-- ════ MAIN APP ════ -->
 <div id="app">
   <header>
@@ -1263,6 +1279,10 @@ function _startKeepAlive() {
 }
 _startKeepAlive(); // inicia imediatamente ao carregar a página
 var _saveTimer = null;
+// Contador de salvamentos pendentes (agendados ou em andamento). Enquanto > 0,
+// nenhuma busca remota (polling ou volta de aba) pode sobrescrever o estado local,
+// pois os dados do servidor ainda podem estar desatualizados em relação à última edição.
+var _pendingSaves = 0;
 
 function _hashDB(data) {
   try {
@@ -1299,6 +1319,7 @@ function _startPolling() {
     })
     .then(function(data) {
       if (!data || (!data.cards && !data.users)) return;
+      if (_pendingSaves > 0) return; // há alteração local não confirmada — não sobrescrever
       var h = _hashDB(data);
       if (h !== _lastRemoteHash) {
         _lastRemoteHash = h;
@@ -1342,6 +1363,10 @@ function saveDB() {
   var tok = null;
   try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
   if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)'); return; }
+  // Marca que há uma alteração local pendente de confirmação no servidor.
+  // Isso bloqueia qualquer sincronização remota (polling / volta de aba) de
+  // sobrescrever o estado local até que este salvamento seja concluído.
+  _pendingSaves++;
   // Debounce: aguarda 500ms antes de enviar para a API
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
@@ -1359,8 +1384,12 @@ function saveDB() {
       } else {
         _showSync('⚠ erro ao salvar na API', 'var(--red)');
       }
+      _pendingSaves = Math.max(0, _pendingSaves - 1);
     })
-    .catch(function(){ _showSync('⚠ offline — salvo localmente', 'var(--gold)'); });
+    .catch(function(){
+      _showSync('⚠ offline — salvo localmente', 'var(--gold)');
+      _pendingSaves = Math.max(0, _pendingSaves - 1);
+    });
   }, 500);
 }
 
@@ -1522,6 +1551,7 @@ document.addEventListener('visibilitychange', function() {
     .then(function(r) { if (!r.ok) return null; return r.json(); })
     .then(function(data) {
       if (!data || (!data.cards && !data.users)) return;
+      if (_pendingSaves > 0) return; // há alteração local não confirmada — não sobrescrever
       var h = _hashDB(data);
       if (h !== _lastRemoteHash) {
         _lastRemoteHash = h;
@@ -1996,86 +2026,114 @@ function showClientPortal(user) {
     });
   }
 
-  // ── HISTÓRICO DE LICITAÇÕES ANTERIORES ──
+  // ── ACESSO AO HISTÓRICO DE PARTICIPAÇÕES (tela separada) ──
   if (historicalCards.length > 0) {
-    html += '<div style="margin-top:32px">'
-      + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:700;color:var(--steel);letter-spacing:0.5px;margin-bottom:4px">Histórico de Participações</div>'
-      + '<div style="font-size:12px;color:var(--silver2);margin-bottom:16px">Licitações anteriores em que você foi nomeado(a)</div>';
+    html += '<div style="margin-top:32px;padding:16px 18px;border-radius:10px;background:rgba(0,0,0,0.10);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+      + '<div>'
+      + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;color:var(--steel)">Histórico de Participações</div>'
+      + '<div style="font-size:12px;color:var(--silver2);margin-top:2px">' + historicalCards.length + ' licitação(ões) anterior(es) em que você foi nomeado(a)</div>'
+      + '</div>'
+      + '<button class="btn btn-sm" onclick="showPortalHistorico()">📋 Ver Histórico</button>'
+      + '</div>';
+  }
 
-    historicalCards.forEach(function(card) {
-      var rp = card.respostaPregao;
-      var rn = card.respostaNomeacao;
-      // Determine outcome colour and label
-      var outcomeCor = 'var(--silver2)';
-      var outcomeLabel = 'Resultado Registrado';
-      var outcomeIcon = '📋';
-      if (rp && rp.status) {
-        var map = {
-          ganha:        { cor:'var(--green)', label:'Licitação Ganha',        icon:'🏆' },
-          perdida:      { cor:'var(--red)',   label:'Licitação Perdida',       icon:'✕' },
-          desabilitada: { cor:'var(--silver2)',label:'Licitação Desabilitada', icon:'⊘' },
-          suspensa:     { cor:'#c9a227',      label:'Licitação Suspensa',      icon:'⏸' },
-          aberta:       { cor:'#c9a227',      label:'Licitação em Aberto',     icon:'📋' }
-        };
-        var m = map[rp.status];
-        if (m) { outcomeCor = m.cor; outcomeLabel = m.label; outcomeIcon = m.icon; }
-      } else if (card.resultado) {
-        var legacyMap = {
+  document.getElementById('portal-content').innerHTML = html;
+  document.getElementById('client-portal').style.display = 'block';
+  document.getElementById('client-portal-historico').style.display = 'none';
+}
+
+// ── Tela dedicada: Histórico de Participações do Portal do Cliente ──
+function showPortalHistorico() {
+  var user = currentUser;
+  var client = db.clients.find(function(c){ return c.email === user.email; });
+  var allCards = db.cards.filter(function(c){ return c.clienteId && client && c.clienteId === client.id; });
+  var historicalCards = allCards.filter(function(c){ return c.col === 'resultado'; });
+
+  var html = '<div class="portal-subtitle" style="margin-bottom:16px">Licitações anteriores em que você foi nomeado(a)</div>';
+
+  if (historicalCards.length === 0) {
+    html += '<div style="padding:40px;text-align:center;color:var(--silver2)">Nenhum histórico de participação registrado.</div>';
+  }
+
+  historicalCards.forEach(function(card) {
+    var rp = card.respostaPregao;
+    var rn = card.respostaNomeacao;
+    // Determine outcome colour and label
+    var outcomeCor = 'var(--silver2)';
+    var outcomeLabel = 'Resultado Registrado';
+    var outcomeIcon = '📋';
+    if (rp && rp.status) {
+      var map = {
+        ganha:        { cor:'var(--green)', label:'Licitação Ganha',        icon:'🏆' },
+        perdida:      { cor:'var(--red)',   label:'Licitação Perdida',       icon:'✕' },
+        desabilitada: { cor:'var(--silver2)',label:'Licitação Desabilitada', icon:'⊘' },
+        suspensa:     { cor:'#c9a227',      label:'Licitação Suspensa',      icon:'⏸' },
+        aberta:       { cor:'#c9a227',      label:'Licitação em Aberto',     icon:'📋' }
+      };
+      var m = map[rp.status];
+      if (m) { outcomeCor = m.cor; outcomeLabel = m.label; outcomeIcon = m.icon; }
+    } else if (card.resultado) {
+      var legacyMap = {
   'Licitação Ganha':                  { cor:'var(--green)',   icon:'🏆' },
   'Licitação Perdida':                { cor:'var(--red)',     icon:'✕'  },
   'Licitação Desabilitada':           { cor:'var(--silver2)', icon:'⊘'  },
   'Licitação Rejeitada pelo Cliente': { cor:'var(--red)',     icon:'✕'  }
 };
-        var lm = legacyMap[card.resultado];
-        if (lm) { outcomeCor = lm.cor; outcomeLabel = card.resultado; outcomeIcon = lm.icon; }
-      }
+      var lm = legacyMap[card.resultado];
+      if (lm) { outcomeCor = lm.cor; outcomeLabel = card.resultado; outcomeIcon = lm.icon; }
+    }
 
-      html += '<div class="edital-card" style="margin-bottom:12px;opacity:0.92">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">'
-        + '<div>'
-        + '<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;background:'+outcomeCor+'18;color:'+outcomeCor+';margin-bottom:6px;border:1px solid '+outcomeCor+'33">'
-        + outcomeIcon + ' ' + outcomeLabel + '</div>'
-        + '<div class="edital-title" style="font-size:14px">' + card.title + '</div>'
-        + '<div style="font-size:11px;color:var(--silver2);margin-top:3px">' + card.entity + '</div>'
-        + '</div>'
-        + '<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--silver2);white-space:nowrap">' + card.id + '</div>'
-        + '</div>'
-        + '<div class="edital-meta" style="grid-template-columns:1fr 1fr;gap:4px 16px">'
-        + '<div><strong>Modalidade:</strong> ' + card.modalidade + '</div>'
-        + '<div><strong>Tipo:</strong> ' + card.tipo + '</div>'
-        + '<div><strong>Valor Estimado:</strong> ' + fmt(card.valor) + '</div>'
-        + '<div><strong>Abertura:</strong> ' + fmtDate(card.dataAbertura) + '</div>'
+    html += '<div class="edital-card" style="margin-bottom:12px;opacity:0.92">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">'
+      + '<div>'
+      + '<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;background:'+outcomeCor+'18;color:'+outcomeCor+';margin-bottom:6px;border:1px solid '+outcomeCor+'33">'
+      + outcomeIcon + ' ' + outcomeLabel + '</div>'
+      + '<div class="edital-title" style="font-size:14px">' + card.title + '</div>'
+      + '<div style="font-size:11px;color:var(--silver2);margin-top:3px">' + card.entity + '</div>'
+      + '</div>'
+      + '<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--silver2);white-space:nowrap">' + card.id + '</div>'
+      + '</div>'
+      + '<div class="edital-meta" style="grid-template-columns:1fr 1fr;gap:4px 16px">'
+      + '<div><strong>Modalidade:</strong> ' + card.modalidade + '</div>'
+      + '<div><strong>Tipo:</strong> ' + card.tipo + '</div>'
+      + '<div><strong>Valor Estimado:</strong> ' + fmt(card.valor) + '</div>'
+      + '<div><strong>Abertura:</strong> ' + fmtDate(card.dataAbertura) + '</div>'
+      + '</div>';
+
+    // Outcome detail
+    if (rp && rp.status === 'ganha') {
+      html += '<div style="margin-top:8px;padding:8px 12px;border-radius:6px;background:rgba(46,125,82,0.08);border:1px solid rgba(46,125,82,0.2);font-size:12px">'
+        + '<strong style="color:var(--green)">🏆 Valor Ganho:</strong> <span style="font-family:IBM Plex Mono,monospace;font-weight:600">'+fmt(rp.valorGanho||0)+'</span>'
+        + (rp.dataResposta ? ' &nbsp;·&nbsp; <span style="color:var(--silver2)">'+rp.dataResposta+'</span>' : '')
         + '</div>';
+    } else if (rp && rp.status === 'perdida') {
+      html += '<div style="margin-top:8px;padding:8px 12px;border-radius:6px;background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.15);font-size:12px">'
+        + '<div><strong>Proposta vencedora:</strong> <span style="font-family:IBM Plex Mono,monospace">'+fmt(rp.valorProposta||0)+'</span></div>'
+        + '<div><strong>Concorrente:</strong> '+escapeHtml(rp.concorrente||'—')+'</div>'
+        + (rp.dataResposta ? '<div style="color:var(--silver2);margin-top:2px">'+rp.dataResposta+'</div>' : '')
+        + '</div>';
+    } else if (rp && rp.status === 'desabilitada') {
+      html += '<div style="margin-top:8px;padding:8px 12px;border-radius:6px;background:rgba(139,146,154,0.08);border:1px solid rgba(139,146,154,0.2);font-size:12px">'
+        + '<strong>Motivo:</strong> '+escapeHtml(rp.motivo||'—')
+        + '</div>';
+    }
 
-      // Outcome detail
-      if (rp && rp.status === 'ganha') {
-        html += '<div style="margin-top:8px;padding:8px 12px;border-radius:6px;background:rgba(46,125,82,0.08);border:1px solid rgba(46,125,82,0.2);font-size:12px">'
-          + '<strong style="color:var(--green)">🏆 Valor Ganho:</strong> <span style="font-family:IBM Plex Mono,monospace;font-weight:600">'+fmt(rp.valorGanho||0)+'</span>'
-          + (rp.dataResposta ? ' &nbsp;·&nbsp; <span style="color:var(--silver2)">'+rp.dataResposta+'</span>' : '')
-          + '</div>';
-      } else if (rp && rp.status === 'perdida') {
-        html += '<div style="margin-top:8px;padding:8px 12px;border-radius:6px;background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.15);font-size:12px">'
-          + '<div><strong>Proposta vencedora:</strong> <span style="font-family:IBM Plex Mono,monospace">'+fmt(rp.valorProposta||0)+'</span></div>'
-          + '<div><strong>Concorrente:</strong> '+escapeHtml(rp.concorrente||'—')+'</div>'
-          + (rp.dataResposta ? '<div style="color:var(--silver2);margin-top:2px">'+rp.dataResposta+'</div>' : '')
-          + '</div>';
-      } else if (rp && rp.status === 'desabilitada') {
-        html += '<div style="margin-top:8px;padding:8px 12px;border-radius:6px;background:rgba(139,146,154,0.08);border:1px solid rgba(139,146,154,0.2);font-size:12px">'
-          + '<strong>Motivo:</strong> '+escapeHtml(rp.motivo||'—')
-          + '</div>';
-      }
-
-      if (rn && rn.status === 'aprovado') {
-        html += '<div style="margin-top:6px;font-size:11px;color:var(--silver2)">Valor proposto na nomeação: <strong>'+fmt(rn.valorProposto||0)+'</strong></div>';
-      }
-
-      html += '</div>';
-    });
+    if (rn && rn.status === 'aprovado') {
+      html += '<div style="margin-top:6px;font-size:11px;color:var(--silver2)">Valor proposto na nomeação: <strong>'+fmt(rn.valorProposto||0)+'</strong></div>';
+    }
 
     html += '</div>';
-  }
+  });
 
-  document.getElementById('portal-content').innerHTML = html;
+  document.getElementById('portal-historico-content').innerHTML = html;
+  var logoImg = document.getElementById('portal-logo-img');
+  if (logoImg) document.getElementById('portal-historico-logo-img').src = logoImg.src;
+  document.getElementById('client-portal').style.display = 'none';
+  document.getElementById('client-portal-historico').style.display = 'block';
+}
+
+function hidePortalHistorico() {
+  document.getElementById('client-portal-historico').style.display = 'none';
   document.getElementById('client-portal').style.display = 'block';
 }
 
@@ -2574,6 +2632,14 @@ function renderBoard() {
       return (c.title||'').toLowerCase().includes(q)||(c.entity||'').toLowerCase().includes(q)||(c.id||'').toLowerCase().includes(q);
     });
 
+    // Ordenar por data de abertura (mais próxima/antiga primeiro); cards sem data ficam no final
+    cards.sort(function(a, b) {
+      if (!a.dataAbertura && !b.dataAbertura) return 0;
+      if (!a.dataAbertura) return 1;
+      if (!b.dataAbertura) return -1;
+      return a.dataAbertura < b.dataAbertura ? -1 : (a.dataAbertura > b.dataAbertura ? 1 : 0);
+    });
+
     var colEl = document.createElement('div');
     colEl.className = 'column col-'+col.id;
     colEl.id = 'col-'+col.id;
@@ -2645,6 +2711,13 @@ function buildCard(card) {
   var clientTag = card.clienteId
     ? '<span class="tag" style="background:rgba(46,125,82,0.08);border-color:rgba(46,125,82,0.2);color:var(--green)">👤 '+clientName(card.clienteId)+'</span>'
     : '';
+  var groupTag = '';
+  if (card.licitacaoGrupoId) {
+    var totalGrupo = db.cards.filter(function(c){ return c.licitacaoGrupoId === card.licitacaoGrupoId; }).length;
+    if (totalGrupo > 1) {
+      groupTag = '<span class="tag" style="background:rgba(184,134,11,0.08);border-color:rgba(184,134,11,0.25);color:var(--bronze)" title="Outros participantes nomeados nesta mesma licitação">🔗 +'+(totalGrupo-1)+' participante'+(totalGrupo-1>1?'s':'')+'</span>';
+    }
+  }
   var attachTag = (card.attachments && card.attachments.length > 0)
     ? '<span class="tag" style="background:rgba(45,111,163,0.08);border-color:rgba(45,111,163,0.2);color:var(--blue)"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> '+card.attachments.length+'</span>'
     : '';
@@ -2677,7 +2750,7 @@ function buildCard(card) {
     +'<div class="card-meta">'
     +'<span class="tag tag-mod">'+card.modalidade+'</span>'
     +'<span class="tag '+typeClass+'">'+card.tipo+'</span>'
-    +resultTag+clientTag+respostaTag+attachTag
+    +resultTag+clientTag+groupTag+respostaTag+attachTag
     +'</div>'
     +'<div class="card-value"><small>Estimado</small><br>'+fmt(card.valor)+'</div>'
     +'<div class="card-footer">'
@@ -2707,7 +2780,15 @@ function openNewCardModal(defaultCol) {
   var modOpts = MODALIDADES.map(function(m){ return '<option>'+m+'</option>'; }).join('');
   var tipOpts = TIPOS.map(function(t){ return '<option>'+t+'</option>'; }).join('');
   var prioOpts = PRIORIDADES.map(function(p){ return '<option>'+p+'</option>'; }).join('');
-  var clientOpts = '<option value="">— Sem nomeação —</option>'+db.clients.filter(function(c){return c.active;}).map(function(c){ return '<option value="'+c.id+'">'+c.name+' ('+c.company+')</option>'; }).join('');
+  var activeClients = db.clients.filter(function(c){return c.active;});
+  var clientChecks = activeClients.length
+    ? activeClients.map(function(c){
+        return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--steel2);cursor:pointer;padding:4px 2px">'
+          + '<input type="checkbox" class="f-cliente-check" value="'+c.id+'"> '
+          + escapeHtml(c.name) + ' <span style="color:var(--silver2)">('+escapeHtml(c.company)+')</span>'
+          + '</label>';
+      }).join('')
+    : '<div style="font-size:12px;color:var(--silver2);padding:4px 2px">Nenhum cliente cadastrado.</div>';
 
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -2729,9 +2810,9 @@ function openNewCardModal(defaultCol) {
     +'<div class="form-group"><div class="form-label">Coluna</div><select class="form-select" id="f_col">'+colOpts+'</select></div>'
     +'<div class="form-group"><div class="form-label">Prioridade</div><select class="form-select" id="f_prio">'+prioOpts+'</select></div>'
     +'</div>'
-    +'<div class="edit-section-label" style="margin-top:8px">Participante & Notificação</div>'
-    +'<div class="form-row"><div class="form-group full"><div class="form-label">Cliente Nomeado <span style="color:var(--silver2);font-weight:400;font-size:10px">(receberá aviso por WhatsApp)</span></div>'
-    +'<select class="form-select" id="f_cliente">'+clientOpts+'</select></div></div>'
+    +'<div class="edit-section-label" style="margin-top:8px">Participantes & Notificação</div>'
+    +'<div class="form-row"><div class="form-group full"><div class="form-label">Participantes Nomeados <span style="color:var(--silver2);font-weight:400;font-size:10px">(selecione um ou mais — cada participante recebe seu próprio card)</span></div>'
+    +'<div id="f_clientes_list" style="display:flex;flex-direction:column;gap:2px;max-height:170px;overflow-y:auto;border:1.5px solid #e0ddd8;border-radius:8px;padding:8px">'+clientChecks+'</div></div></div>'
     +'<div id="f_wa_preview"></div>'
     +'<div class="edit-section-label" style="margin-top:8px">Observações</div>'
     +'<div class="form-row"><div class="form-group full"><textarea class="form-textarea" id="f_obs" placeholder="Notas relevantes..." style="min-height:80px"></textarea></div></div>'
@@ -2740,26 +2821,30 @@ function openNewCardModal(defaultCol) {
   overlay.addEventListener('click', function(e){ if(e.target===overlay) closeAllModals(); });
   document.body.appendChild(overlay);
 
-  // Preview WA ao selecionar cliente
-  var fClSelect = document.getElementById('f_cliente');
+  // Preview WA para cada participante selecionado
   function updateFWaPreview() {
-    var cId = fClSelect.value;
     var previewEl = document.getElementById('f_wa_preview');
-    if (!cId) { previewEl.innerHTML = ''; return; }
-    var cl = db.clients.find(function(x){return x.id===cId;});
-    if (!cl) { previewEl.innerHTML = ''; return; }
-    var waLink = cl.whatsapp ? buildWaLink(cl, null) : '';
-    var info = '<div class="wa-notify-box">'
-      +'<div class="wa-notify-info">'
-      +'<div style="font-weight:600;color:var(--steel)">'+cl.name+'</div>'
-      +'<div style="color:var(--silver2);font-size:11px">'+cl.company+(cl.whatsapp?' · '+cl.whatsapp:'')+'</div>'
-      +(cl.whatsapp?'<div style="font-size:11px;color:var(--green);margin-top:3px">✓ Aviso de nomeação será enviado após salvar</div>':'<div style="font-size:11px;color:var(--red);margin-top:3px">⚠ Sem WhatsApp cadastrado</div>')
-      +'</div>'
-      +(cl.whatsapp?''+waLink:'')
-      +'</div>';
-    previewEl.innerHTML = info;
+    var checked = Array.prototype.map.call(document.querySelectorAll('#f_clientes_list input.f-cliente-check:checked'), function(el){ return el.value; });
+    if (!checked.length) { previewEl.innerHTML = ''; return; }
+    var html = checked.length > 1 ? '<div style="font-size:11px;color:var(--bronze);font-weight:600;margin:4px 0">🔗 '+checked.length+' cards serão criados, um para cada participante</div>' : '';
+    checked.forEach(function(cId) {
+      var cl = db.clients.find(function(x){return x.id===cId;});
+      if (!cl) return;
+      var waLink = cl.whatsapp ? buildWaLink(cl, null) : '';
+      html += '<div class="wa-notify-box" style="margin-top:6px">'
+        +'<div class="wa-notify-info">'
+        +'<div style="font-weight:600;color:var(--steel)">'+cl.name+'</div>'
+        +'<div style="color:var(--silver2);font-size:11px">'+cl.company+(cl.whatsapp?' · '+cl.whatsapp:'')+'</div>'
+        +(cl.whatsapp?'<div style="font-size:11px;color:var(--green);margin-top:3px">✓ Aviso de nomeação será enviado após salvar</div>':'<div style="font-size:11px;color:var(--red);margin-top:3px">⚠ Sem WhatsApp cadastrado</div>')
+        +'</div>'
+        +(cl.whatsapp?waLink:'')
+        +'</div>';
+    });
+    previewEl.innerHTML = html;
   }
-  fClSelect.addEventListener('change', updateFWaPreview);
+  Array.prototype.forEach.call(document.querySelectorAll('#f_clientes_list input.f-cliente-check'), function(cb){
+    cb.addEventListener('change', updateFWaPreview);
+  });
   updateFWaPreview();
   setTimeout(function(){ document.getElementById('f_title').focus(); }, 50);
 }
@@ -2768,25 +2853,49 @@ function saveNewCard() {
   var title = document.getElementById('f_title').value.trim();
   var entity = document.getElementById('f_entity').value.trim();
   if (!title||!entity) { toast('Preencha título e órgão','warning'); return; }
-  var id = nextCardId();
-  db.nextCardId++;
-  var fClienteId = document.getElementById('f_cliente') ? document.getElementById('f_cliente').value||null : null;
+
+  var selectedClientIds = Array.prototype.map.call(
+    document.querySelectorAll('#f_clientes_list input.f-cliente-check:checked'),
+    function(el){ return el.value; }
+  );
+  if (selectedClientIds.length === 0) selectedClientIds = [null];
+
   var col = document.getElementById('f_col').value;
-  // Auto-avanço: se cliente nomeado na fase de Captação → avança para Nomeação
-  if (fClienteId && col === 'captacao') col = 'nomeacao';
-  db.cards.push({ id:id, col:col, title:title, entity:entity,
-    modalidade:document.getElementById('f_mod').value, tipo:document.getElementById('f_tipo').value,
-    valor:parseFloat(document.getElementById('f_valor').value)||0,
-    dataAbertura:document.getElementById('f_data').value,
-    prioridade:document.getElementById('f_prio').value,
-    obs:document.getElementById('f_obs').value.trim(), clienteId:fClienteId, resultado:null, attachments:[] });
+  // Auto-avanço: se ao menos um participante nomeado na fase de Captação → avança para Nomeação
+  if (selectedClientIds[0] && col === 'captacao') col = 'nomeacao';
+
+  var mod   = document.getElementById('f_mod').value;
+  var tipo  = document.getElementById('f_tipo').value;
+  var valor = parseFloat(document.getElementById('f_valor').value)||0;
+  var data  = document.getElementById('f_data').value;
+  var prio  = document.getElementById('f_prio').value;
+  var obs   = document.getElementById('f_obs').value.trim();
+
+  // Reserva o ID do primeiro card como identificador do grupo (quando houver múltiplos participantes)
+  var grupoId = selectedClientIds.length > 1 ? nextCardId() : null;
+
+  var createdIds = [];
+  selectedClientIds.forEach(function(cid) {
+    var id = nextCardId();
+    db.nextCardId++;
+    db.cards.push({
+      id:id, col:col, title:title, entity:entity,
+      modalidade:mod, tipo:tipo, valor:valor, dataAbertura:data,
+      prioridade:prio, obs:obs, clienteId:cid, resultado:null, attachments:[],
+      licitacaoGrupoId: grupoId
+    });
+    createdIds.push(id);
+  });
+
   closeAllModals(); render(); saveDB();
-  if (fClienteId && col === 'nomeacao') {
+  if (selectedClientIds.length > 1) {
+    toast(selectedClientIds.length+' licitações criadas — uma para cada participante nomeado!', 'success');
+  } else if (selectedClientIds[0] && col === 'nomeacao') {
     toast('Licitação criada e avançada para Nomeação!', 'success');
   } else {
     toast('Licitação criada!','success');
   }
-  setTimeout(function(){ openDetailModal(id); }, 150);
+  setTimeout(function(){ openDetailModal(createdIds[0]); }, 150);
 }
 
 function openDetailModal(cardId) {
@@ -2810,6 +2919,25 @@ function openDetailModal(cardId) {
     var cl = db.clients.find(function(x){return x.id===card.clienteId;});
     if (cl && cl.whatsapp) waBtn = buildWaLink(cl, card);
   }
+
+  // Co-participantes: outros cards vinculados à mesma licitação
+  var siblingCardsDetail = card.licitacaoGrupoId
+    ? db.cards.filter(function(c){ return c.licitacaoGrupoId === card.licitacaoGrupoId && c.id !== card.id; })
+    : [];
+  var siblingsDetailHtml = siblingCardsDetail.length
+    ? '<div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(184,134,11,0.06);border:1px solid rgba(184,134,11,0.18)">'
+      + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--bronze);margin-bottom:6px">🔗 Co-participantes desta Licitação</div>'
+      + siblingCardsDetail.map(function(sc){
+          var scColor = COL_COLORS[sc.col] || 'var(--bronze)';
+          return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0">'
+            + '<span><strong>'+escapeHtml(clientName(sc.clienteId))+'</strong> <span style="color:var(--silver2);font-family:IBM Plex Mono,monospace;font-size:10px">'+sc.id+'</span></span>'
+            + '<span style="display:flex;align-items:center;gap:6px">'
+            + '<span style="font-size:10px;font-weight:600;color:'+scColor+'">'+colLabel(sc.col)+'</span>'
+            + '<a href="#" onclick="openDetailModal(\''+sc.id+'\');return false;" style="font-size:11px;color:var(--blue)">Abrir</a>'
+            + '</span></div>';
+        }).join('')
+      + '</div>'
+    : '';
 
   // Anexos
   var attachHtml = buildAttachList(card, false);
@@ -2848,6 +2976,7 @@ function openDetailModal(cardId) {
     +'<div class="detail-section-title">Participante</div>'
     +'<div class="detail-item"><div class="detail-item-label">Nomeado</div><div class="detail-item-value">'+clientName(card.clienteId)+'</div></div>'
     +(waBtn?'<div style="margin-top:6px">'+waBtn+'</div>':'')
+    +siblingsDetailHtml
     +(card.respostaNomeacao && card.respostaNomeacao.status
       ? (card.respostaNomeacao.status==='aprovado'
           ? '<div class="detail-item" style="margin-top:8px"><div class="detail-item-label">Resp. Nomeação</div><div class="detail-item-value"><span class="tag tag-ganhou">✓ Aprovado</span></div></div>'
@@ -3110,6 +3239,31 @@ function openEditModal(cardId) {
   var resOpts = ['','Licitação Ganha','Licitação Perdida','Licitação Desabilitada','Licitação Suspensa','Licitação em Aberto'].map(function(r){ return '<option value="'+r+'"'+((card.resultado||'')=== r?' selected':'')+'>'+(r||'\u2014 Sem resultado \u2014')+'</option>'; }).join('');
   var clientOpts = '<option value="">\u2014 Sem nomea\u00e7\u00e3o \u2014</option>'+db.clients.filter(function(c){return c.active;}).map(function(c){ return '<option value="'+c.id+'"'+(c.id===card.clienteId?' selected':'')+'>'+c.name+' ('+c.company+')</option>'; }).join('');
 
+  // ── Co-participantes: outros cards vinculados à mesma licitação (mesmo grupo) ──
+  var grupoIdAtual = card.licitacaoGrupoId || null;
+  var siblingCards = grupoIdAtual ? db.cards.filter(function(c){ return c.licitacaoGrupoId === grupoIdAtual && c.id !== card.id; }) : [];
+  var participantesJaNomeados = [card.clienteId].concat(siblingCards.map(function(c){return c.clienteId;})).filter(Boolean);
+  var siblingsHtml = siblingCards.length
+    ? siblingCards.map(function(sc){
+        var scColor = COL_COLORS[sc.col] || 'var(--bronze)';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:6px;background:rgba(0,0,0,0.04);margin-bottom:4px;font-size:12px">'
+          + '<div><strong>'+escapeHtml(clientName(sc.clienteId))+'</strong> <span style="color:var(--silver2);font-family:IBM Plex Mono,monospace;font-size:10px">'+sc.id+'</span></div>'
+          + '<div style="display:flex;align-items:center;gap:6px">'
+          + '<span style="font-size:10px;font-weight:600;color:'+scColor+'">'+colLabel(sc.col)+'</span>'
+          + '<button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px" onclick="openDetailModal(\''+sc.id+'\')">Abrir</button>'
+          + '</div></div>';
+      }).join('')
+    : '<div style="font-size:11px;color:var(--silver2);margin-bottom:6px">Nenhum outro participante nomeado ainda nesta licitação.</div>';
+  var extraClients = db.clients.filter(function(c){ return c.active && participantesJaNomeados.indexOf(c.id) === -1; });
+  var extraClientChecks = extraClients.length
+    ? extraClients.map(function(c){
+        return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--steel2);cursor:pointer;padding:4px 2px">'
+          + '<input type="checkbox" class="e-extra-cliente-check" value="'+c.id+'"> '
+          + escapeHtml(c.name) + ' <span style="color:var(--silver2)">('+escapeHtml(c.company)+')</span>'
+          + '</label>';
+      }).join('')
+    : '<div style="font-size:11px;color:var(--silver2);padding:4px 2px">Todos os clientes ativos já foram nomeados nesta licitação.</div>';
+
   var attachHtml = buildAttachList(card, true);
 
   var overlay = document.createElement('div');
@@ -3157,6 +3311,10 @@ function openEditModal(cardId) {
     +'<div class="form-row"><div class="form-group full"><div class="form-label">Cliente Nomeado <span style="color:var(--silver2);font-weight:400;font-size:10px">(aviso via WhatsApp ao salvar)</span></div>'
     +'<select class="form-select" id="e_cliente">'+clientOpts+'</select></div></div>'
     +'<div id="e_wa_preview"></div>'
+    +'<div class="edit-section-label" style="margin-top:8px">Outros Participantes desta Licita\u00e7\u00e3o</div>'
+    +siblingsHtml
+    +'<div class="form-row"><div class="form-group full"><div class="form-label">Adicionar Participante(s) <span style="color:var(--silver2);font-weight:400;font-size:10px">(cria um novo card vinculado, na mesma etapa)</span></div>'
+    +'<div id="e_extra_clientes_list" style="display:flex;flex-direction:column;gap:2px;max-height:140px;overflow-y:auto;border:1.5px solid #e0ddd8;border-radius:8px;padding:8px">'+extraClientChecks+'</div></div></div>'
     +'<div class="edit-section-label" style="margin-top:8px">Observa\u00e7\u00f5es</div>'
     +'<div class="form-row"><div class="form-group full">'
     +'<textarea class="form-textarea" id="e_obs" placeholder="Notas relevantes..." style="min-height:90px">'+escapeHtml(card.obs||'')+'</textarea>'
@@ -3266,6 +3424,27 @@ function saveEditModal(cardId) {
     } else if (resultadoVal === 'Licitação Desabilitada') {
       card.respostaPregao.status = 'desabilitada';
     }
+  }
+
+  // ── Nomear participantes extras: cria um card vinculado para cada um ──
+  var extraClienteIds = Array.prototype.map.call(
+    document.querySelectorAll('#e_extra_clientes_list input.e-extra-cliente-check:checked'),
+    function(el){ return el.value; }
+  );
+  if (extraClienteIds.length > 0) {
+    if (!card.licitacaoGrupoId) card.licitacaoGrupoId = card.id;
+    extraClienteIds.forEach(function(cid) {
+      var newId = nextCardId();
+      db.nextCardId++;
+      db.cards.push({
+        id:newId, col:card.col, title:card.title, entity:card.entity,
+        modalidade:card.modalidade, tipo:card.tipo, valor:card.valor,
+        dataAbertura:card.dataAbertura, prioridade:card.prioridade,
+        obs:card.obs, clienteId:cid, resultado:null, attachments:[],
+        licitacaoGrupoId: card.licitacaoGrupoId
+      });
+    });
+    toastMsg += ' +' + extraClienteIds.length + ' participante(s) nomeado(s).';
   }
 
   closeAllModals();
