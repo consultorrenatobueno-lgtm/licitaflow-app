@@ -1377,6 +1377,7 @@ function saveDB() {
 }
 
 function _sendSave(tok, attempt) {
+  var RETRY_DELAYS = [5000, 10000, 15000, 20000]; // até ~50s no total, cobre o cold-start do Render free
   fetch(API_URL + '/db', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-auth-token': tok },
@@ -1397,9 +1398,9 @@ function _sendSave(tok, attempt) {
   .catch(function(){
     // Falha de rede real (comum quando o servidor Render "dorme" e está acordando).
     // Tenta de novo automaticamente antes de desistir e avisar o usuário.
-    if (attempt < 2) {
+    if (attempt < RETRY_DELAYS.length) {
       _showSync('⟳ servidor acordando, tentando de novo…', 'var(--gold)');
-      setTimeout(function(){ _sendSave(tok, attempt + 1); }, 4000 + attempt * 4000);
+      setTimeout(function(){ _sendSave(tok, attempt + 1); }, RETRY_DELAYS[attempt]);
     } else {
       _showSync('⚠ offline — salvo localmente', 'var(--gold)');
       _pendingSaves = Math.max(0, _pendingSaves - 1);
