@@ -1288,7 +1288,6 @@ var _saveTimer = null;
 // Contador de salvamentos pendentes (agendados ou em andamento). Enquanto > 0,
 // nenhuma busca remota (polling ou volta de aba) pode sobrescrever o estado local,
 // pois os dados do servidor ainda podem estar desatualizados em relação à última edição.
-var _pendingSaves = 0;
 
 function _hashDB(data) {
   try {
@@ -1325,7 +1324,7 @@ function _startPolling() {
     })
     .then(function(data) {
       if (!data || (!data.cards && !data.users)) return;
-      if (_pendingSaves > 0 || _unsyncedChanges) return; // há alteração local não confirmada — não sobrescrever
+      if (_hasUnsavedChange) return; // há alteração local não confirmada — não sobrescrever
       var h = _hashDB(data);
       if (h !== _lastRemoteHash) {
         _lastRemoteHash = h;
@@ -1363,28 +1362,32 @@ function _dbLightCopy() {
 }
 
 function saveDB() {
+  // Marca IMEDIATAMENTE (antes do debounce) que há uma alteração local não
+  // confirmada no servidor. É essencial que isso seja síncrono: se só
+  // marcássemos quando o envio de fato começasse (depois dos 500ms de
+  // debounce), fechar a aba ou recarregar a página dentro dessa janela
+  // faria o setTimeout nunca disparar — e a alteração se perderia em
+  // silêncio, sem nenhum aviso, porque nada teria sido marcado como pendente.
+  _hasUnsavedChange = true;
   // Salva localmente SEM os base64 (economiza localStorage)
   try { localStorage.setItem(DB_KEY, JSON.stringify(_dbLightCopy())); } catch(e) {}
   // Reler token do localStorage para garantir que está atualizado
   var tok = null;
   try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
-  if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)'); return; }
+  if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)', true); return; }
   // Debounce: aguarda 500ms antes de enviar para a API.
-  // IMPORTANTE: _pendingSaves só é incrementado quando o envio de fato ocorre
-  // (dentro do timeout), nunca a cada chamada de saveDB() — chamadas repetidas
-  // dentro da janela de debounce cancelam o timer anterior e resultam em um
-  // único _sendSave. Incrementar aqui fora causava contador "preso" acima de
-  // zero, bloqueando o polling remoto permanentemente naquela aba.
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
-    _pendingSaves++;
     _showSync('↑ sincronizando…');
     _sendSave(tok, 0);
   }, 500);
 }
 
+var _hasUnsavedChange = false; // true desde a edição até o servidor confirmar o save
+var _bgRetryTimer = null;
+
 function _sendSave(tok, attempt) {
-  var RETRY_DELAYS = [5000, 10000, 15000, 20000]; // até ~50s no total, cobre o cold-start do Render free
+  var RETRY_DELAYS = [5000, 10000, 15000, 20000]; // até ~50s no total, cobre eventuais reinícios do Render
   fetch(API_URL + '/db', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-auth-token': tok },
@@ -1399,45 +1402,37 @@ function _sendSave(tok, attempt) {
     if (d && d.ok !== false) {
       _showSync('✓ salvo', 'var(--green)');
       _lastRemoteHash = _hashDB(db);
-      _unsyncedChanges = false;
+      _hasUnsavedChange = false;
     }
-    _pendingSaves = Math.max(0, _pendingSaves - 1);
   })
   .catch(function(){
-    // Falha de rede real (comum quando o servidor Render "dorme" e está acordando).
+    // Falha de rede real (ex.: instabilidade momentânea de conexão).
     // Tenta de novo automaticamente antes de desistir e avisar o usuário.
     if (attempt < RETRY_DELAYS.length) {
-      _showSync('⟳ servidor acordando, tentando de novo…', 'var(--gold)', true);
+      _showSync('⟳ tentando salvar de novo…', 'var(--gold)', true);
       setTimeout(function(){ _sendSave(tok, attempt + 1); }, RETRY_DELAYS[attempt]);
     } else {
-      // Não desiste de vez: marca como não sincronizado e continua tentando
-      // em segundo plano a cada 30s, além de tentar assim que a conexão
-      // voltar. Sem isso, a alteração se perdia silenciosamente no próximo
-      // reload da página.
-      _unsyncedChanges = true;
+      // Não desiste de vez: continua tentando em segundo plano a cada 30s,
+      // além de tentar assim que a conexão voltar (evento 'online').
       _showSync('⚠ sem conexão — tentando salvar em segundo plano', 'var(--red)', true);
-      _pendingSaves = Math.max(0, _pendingSaves - 1);
       clearTimeout(_bgRetryTimer);
       _bgRetryTimer = setTimeout(function(){
-        if (_unsyncedChanges) { _pendingSaves++; _sendSave(tok, 0); }
+        if (_hasUnsavedChange) _sendSave(tok, 0);
       }, 30000);
     }
   });
 }
 
-var _unsyncedChanges = false;
-var _bgRetryTimer = null;
-
 window.addEventListener('online', function() {
-  if (_unsyncedChanges) {
+  if (_hasUnsavedChange) {
     var tok = null;
     try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
-    if (tok) { clearTimeout(_bgRetryTimer); _pendingSaves++; _sendSave(tok, 0); }
+    if (tok) { clearTimeout(_bgRetryTimer); _sendSave(tok, 0); }
   }
 });
 
 window.addEventListener('beforeunload', function(e) {
-  if (_unsyncedChanges) {
+  if (_hasUnsavedChange) {
     e.preventDefault();
     e.returnValue = 'Há alterações que ainda não foram salvas no servidor. Sair mesmo assim?';
     return e.returnValue;
@@ -1602,7 +1597,7 @@ document.addEventListener('visibilitychange', function() {
     .then(function(r) { if (!r.ok) return null; return r.json(); })
     .then(function(data) {
       if (!data || (!data.cards && !data.users)) return;
-      if (_pendingSaves > 0 || _unsyncedChanges) return; // há alteração local não confirmada — não sobrescrever
+      if (_hasUnsavedChange) return; // há alteração local não confirmada — não sobrescrever
       var h = _hashDB(data);
       if (h !== _lastRemoteHash) {
         _lastRemoteHash = h;
