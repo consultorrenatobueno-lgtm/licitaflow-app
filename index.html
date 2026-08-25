@@ -1364,13 +1364,15 @@ function saveDB() {
   var tok = null;
   try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
   if (!tok) { _showSync('⚠ sem sessão — salvo localmente', 'var(--gold)'); return; }
-  // Marca que há uma alteração local pendente de confirmação no servidor.
-  // Isso bloqueia qualquer sincronização remota (polling / volta de aba) de
-  // sobrescrever o estado local até que este salvamento seja concluído.
-  _pendingSaves++;
-  // Debounce: aguarda 500ms antes de enviar para a API
+  // Debounce: aguarda 500ms antes de enviar para a API.
+  // IMPORTANTE: _pendingSaves só é incrementado quando o envio de fato ocorre
+  // (dentro do timeout), nunca a cada chamada de saveDB() — chamadas repetidas
+  // dentro da janela de debounce cancelam o timer anterior e resultam em um
+  // único _sendSave. Incrementar aqui fora causava contador "preso" acima de
+  // zero, bloqueando o polling remoto permanentemente naquela aba.
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
+    _pendingSaves++;
     _showSync('↑ sincronizando…');
     _sendSave(tok, 0);
   }, 500);
@@ -2890,10 +2892,15 @@ function openNewCardModal(defaultCol) {
   setTimeout(function(){ document.getElementById('f_title').focus(); }, 50);
 }
 
+var _savingNewCard = false;
 function saveNewCard() {
+  if (_savingNewCard) return; // trava contra clique duplo / duplo submit
   var title = document.getElementById('f_title').value.trim();
   var entity = document.getElementById('f_entity').value.trim();
   if (!title||!entity) { toast('Preencha título e órgão','warning'); return; }
+  _savingNewCard = true;
+  var btn = document.querySelector('.modal-footer .btn-primary');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; }
 
   var selectedClientIds = Array.prototype.map.call(
     document.querySelectorAll('#f_clientes_list input.f-cliente-check:checked'),
@@ -2931,6 +2938,7 @@ function saveNewCard() {
       createdIds.push(id);
     });
 
+    _savingNewCard = false;
     closeAllModals(); render(); saveDB();
     if (selectedClientIds.length > 1) {
       toast(selectedClientIds.length+' licitações criadas — uma para cada participante nomeado!', 'success');
@@ -2940,6 +2948,10 @@ function saveNewCard() {
       toast('Licitação criada!','success');
     }
     setTimeout(function(){ openDetailModal(createdIds[0]); }, 150);
+  }).catch(function(){
+    _savingNewCard = false;
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+    toast('Erro ao criar licitação — tente novamente', 'danger');
   });
 }
 
