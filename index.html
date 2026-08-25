@@ -1247,7 +1247,7 @@ function _authHeaders() {
 
 // Indicador visual de sincronização
 var _syncEl = null;
-function _showSync(msg, color) {
+function _showSync(msg, color, persist) {
   if (!_syncEl) {
     _syncEl = document.createElement('div');
     _syncEl.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);'
@@ -1259,7 +1259,12 @@ function _showSync(msg, color) {
   _syncEl.style.borderLeft = '3px solid ' + (color || 'var(--bronze)');
   _syncEl.style.opacity = '1';
   clearTimeout(_syncEl._t);
-  _syncEl._t = setTimeout(function(){ _syncEl.style.opacity = '0'; }, 2000);
+  // Mensagens de erro/offline ficam visíveis até serem substituídas por um
+  // salvamento bem-sucedido — sumir sozinha em 2s fazia o aviso passar
+  // despercebido e a pessoa perder a alteração sem saber.
+  if (!persist) {
+    _syncEl._t = setTimeout(function(){ _syncEl.style.opacity = '0'; }, 2000);
+  }
 }
 
 // ── Polling de sincronização ──
@@ -1320,7 +1325,7 @@ function _startPolling() {
     })
     .then(function(data) {
       if (!data || (!data.cards && !data.users)) return;
-      if (_pendingSaves > 0) return; // há alteração local não confirmada — não sobrescrever
+      if (_pendingSaves > 0 || _unsyncedChanges) return; // há alteração local não confirmada — não sobrescrever
       var h = _hashDB(data);
       if (h !== _lastRemoteHash) {
         _lastRemoteHash = h;
@@ -1386,14 +1391,15 @@ function _sendSave(tok, attempt) {
     body: JSON.stringify(db)
   })
   .then(function(r){
-    if (r.status === 401) { _showSync('⚠ sessão expirada — faça login novamente', 'var(--red)'); return null; }
-    if (!r.ok) { _showSync('⚠ erro ao salvar (servidor)', 'var(--red)'); return null; }
+    if (r.status === 401) { _showSync('⚠ sessão expirada — faça login novamente', 'var(--red)', true); return null; }
+    if (!r.ok) { _showSync('⚠ erro ao salvar (servidor)', 'var(--red)', true); return null; }
     return r.json();
   })
   .then(function(d){
     if (d && d.ok !== false) {
       _showSync('✓ salvo', 'var(--green)');
       _lastRemoteHash = _hashDB(db);
+      _unsyncedChanges = false;
     }
     _pendingSaves = Math.max(0, _pendingSaves - 1);
   })
@@ -1401,14 +1407,42 @@ function _sendSave(tok, attempt) {
     // Falha de rede real (comum quando o servidor Render "dorme" e está acordando).
     // Tenta de novo automaticamente antes de desistir e avisar o usuário.
     if (attempt < RETRY_DELAYS.length) {
-      _showSync('⟳ servidor acordando, tentando de novo…', 'var(--gold)');
+      _showSync('⟳ servidor acordando, tentando de novo…', 'var(--gold)', true);
       setTimeout(function(){ _sendSave(tok, attempt + 1); }, RETRY_DELAYS[attempt]);
     } else {
-      _showSync('⚠ offline — salvo localmente', 'var(--gold)');
+      // Não desiste de vez: marca como não sincronizado e continua tentando
+      // em segundo plano a cada 30s, além de tentar assim que a conexão
+      // voltar. Sem isso, a alteração se perdia silenciosamente no próximo
+      // reload da página.
+      _unsyncedChanges = true;
+      _showSync('⚠ sem conexão — tentando salvar em segundo plano', 'var(--red)', true);
       _pendingSaves = Math.max(0, _pendingSaves - 1);
+      clearTimeout(_bgRetryTimer);
+      _bgRetryTimer = setTimeout(function(){
+        if (_unsyncedChanges) { _pendingSaves++; _sendSave(tok, 0); }
+      }, 30000);
     }
   });
 }
+
+var _unsyncedChanges = false;
+var _bgRetryTimer = null;
+
+window.addEventListener('online', function() {
+  if (_unsyncedChanges) {
+    var tok = null;
+    try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
+    if (tok) { clearTimeout(_bgRetryTimer); _pendingSaves++; _sendSave(tok, 0); }
+  }
+});
+
+window.addEventListener('beforeunload', function(e) {
+  if (_unsyncedChanges) {
+    e.preventDefault();
+    e.returnValue = 'Há alterações que ainda não foram salvas no servidor. Sair mesmo assim?';
+    return e.returnValue;
+  }
+});
 
 function loadDB() {
   // Carrega do localStorage como estado inicial (evita tela branca)
@@ -1568,7 +1602,7 @@ document.addEventListener('visibilitychange', function() {
     .then(function(r) { if (!r.ok) return null; return r.json(); })
     .then(function(data) {
       if (!data || (!data.cards && !data.users)) return;
-      if (_pendingSaves > 0) return; // há alteração local não confirmada — não sobrescrever
+      if (_pendingSaves > 0 || _unsyncedChanges) return; // há alteração local não confirmada — não sobrescrever
       var h = _hashDB(data);
       if (h !== _lastRemoteHash) {
         _lastRemoteHash = h;
