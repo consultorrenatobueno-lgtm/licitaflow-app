@@ -1391,7 +1391,7 @@ function _sendSave(tok, attempt) {
   fetch(API_URL + '/db', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-auth-token': tok },
-    body: JSON.stringify(db)
+    body: JSON.stringify(_buildSavePayload())
   })
   .then(function(r){
     if (r.status === 401) { _showSync('⚠ sessão expirada — faça login novamente', 'var(--red)', true); return null; }
@@ -1403,6 +1403,7 @@ function _sendSave(tok, attempt) {
       _showSync('✓ salvo', 'var(--green)');
       _lastRemoteHash = _hashDB(db);
       _hasUnsavedChange = false;
+      _refreshAttachmentsCache();
     }
   })
   .catch(function(){
@@ -1465,6 +1466,50 @@ function _applyDB(saved) {
     }
   });
   if (migrated) saveDB();
+  _refreshAttachmentsCache();
+}
+
+// Cache do último estado de anexos confirmado no servidor (por card/cliente),
+// usada para evitar reenviar base64 de anexos que não mudaram a cada save —
+// ver _buildSavePayload().
+var _syncedAttachmentsCache = { cards: {}, clients: {} };
+function _refreshAttachmentsCache() {
+  (db.cards || []).forEach(function(c) {
+    _syncedAttachmentsCache.cards[c.id] = JSON.stringify(c.attachments || []);
+  });
+  (db.clients || []).forEach(function(c) {
+    _syncedAttachmentsCache.clients[c.id] = JSON.stringify(c.habDocs || []);
+  });
+}
+
+// Monta o payload de envio: cards/clientes cujos anexos não mudaram desde a
+// última confirmação do servidor vão com attachments/habDocs substituídos
+// por um marcador ('__unchanged__') em vez do base64 completo. O servidor
+// (mergeArrayById) reconhece o marcador e preserva o valor já armazenado.
+// Isso evita reenviar dezenas de MB de anexos a cada salvamento quando só
+// um campo de texto de um card mudou.
+function _buildSavePayload() {
+  var payload = {};
+  Object.keys(db).forEach(function(key) { payload[key] = db[key]; });
+  payload.cards = (db.cards || []).map(function(c) {
+    var current = JSON.stringify(c.attachments || []);
+    if (_syncedAttachmentsCache.cards[c.id] === current) {
+      var copy = Object.assign({}, c);
+      copy.attachments = '__unchanged__';
+      return copy;
+    }
+    return c;
+  });
+  payload.clients = (db.clients || []).map(function(c) {
+    var current = JSON.stringify(c.habDocs || []);
+    if (_syncedAttachmentsCache.clients[c.id] === current) {
+      var copy = Object.assign({}, c);
+      copy.habDocs = '__unchanged__';
+      return copy;
+    }
+    return c;
+  });
+  return payload;
 }
 
 function loadDBRemote(callback) {
