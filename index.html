@@ -3529,9 +3529,44 @@ function deleteCard(cardId) {
     'Tem certeza que deseja excluir <strong>'+escapeHtml(card.title)+'</strong>?<br><span style="color:var(--red);font-size:12px">Esta ação não pode ser desfeita.</span>',
     function() {
       db.cards = db.cards.filter(function(c){return c.id!==cardId;});
-      closeAllModals(); render(); saveDB(); toast('Licitação excluída','info');
+      closeAllModals(); render();
+      try { localStorage.setItem(DB_KEY, JSON.stringify(_dbLightCopy())); } catch(e) {}
+      _deleteCardRemote(cardId, 0);
+      toast('Licitação excluída','info');
     }
   );
+}
+
+// Exclusão real no servidor via endpoint dedicado (DELETE /cards/:id).
+// Necessário porque o merge-por-ID usado em POST /db nunca remove itens
+// ausentes — só chamar saveDB() após um delete local não persistia a
+// exclusão, e ela "voltava" no próximo polling. Mesmo padrão de retry do
+// _sendSave, para cobrir o cold-start do Render free-tier.
+function _deleteCardRemote(cardId, attempt) {
+  var RETRY_DELAYS = [5000, 10000, 15000, 20000];
+  var tok = null;
+  try { tok = localStorage.getItem(AUTH_TOKEN_KEY); } catch(e) {}
+  if (!tok) { _showSync('⚠ sem sessão — exclusão não confirmada no servidor', 'var(--red)'); return; }
+  fetch(API_URL + '/cards/' + encodeURIComponent(cardId), {
+    method: 'DELETE',
+    headers: { 'x-auth-token': tok }
+  })
+  .then(function(r) {
+    if (r.status === 401) { _showSync('⚠ sessão expirada — faça login novamente', 'var(--red)'); return null; }
+    if (!r.ok) throw new Error('erro ao excluir no servidor');
+    return r.json();
+  })
+  .then(function(d) {
+    if (d) _showSync('✓ exclusão confirmada', 'var(--green)');
+  })
+  .catch(function() {
+    if (attempt < RETRY_DELAYS.length) {
+      _showSync('⟳ servidor acordando, tentando excluir de novo…', 'var(--gold)');
+      setTimeout(function(){ _deleteCardRemote(cardId, attempt + 1); }, RETRY_DELAYS[attempt]);
+    } else {
+      _showSync('⚠ exclusão pode não ter sido salva no servidor — verifique', 'var(--red)');
+    }
+  });
 }
 
 // Modal de confirmação reutilizável
