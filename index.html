@@ -765,6 +765,40 @@ tbody tr:hover td { background: #faf9f7; }
 .portal-modal-title { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; color: var(--steel); }
 .portal-modal-body { padding: 0 24px 24px; }
 .portal-modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+/* ── Relatório: filtros, indicadores, gráficos ── */
+.rel-filtros { display:grid; grid-template-columns: minmax(180px,1.4fr) repeat(3,minmax(150px,1fr)) repeat(2,minmax(130px,0.8fr)) auto; gap:10px 12px; align-items:end; margin-bottom:18px; padding:14px 16px; background:var(--white); border:1.5px solid #e0ddd8; border-radius:var(--radius); box-shadow:var(--shadow); }
+.rel-filtros .form-group { margin:0; min-width:0; }
+.rel-filtros .form-input, .rel-filtros .form-select { width:100%; }
+@media (max-width: 1100px) { .rel-filtros { grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); } }
+.rel-kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+.rel-kpi { background:var(--white); border:1.5px solid #e0ddd8; border-radius:var(--radius); padding:12px 14px; box-shadow:var(--shadow); min-width:0; }
+.rel-kpi-label { font-size:10px; font-weight:600; letter-spacing:0.8px; text-transform:uppercase; color:var(--silver2); margin-bottom:4px; }
+.rel-kpi-val { font-family:'IBM Plex Mono',monospace; font-size:17px; font-weight:600; color:var(--steel); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rel-kpi-sub { font-size:10.5px; color:var(--silver2); margin-top:2px; }
+.rel-graficos-head { display:flex; justify-content:flex-end; margin-bottom:8px; }
+.rel-graficos { display:grid; grid-template-columns: 1.3fr 1fr; gap:14px; margin-bottom:18px; }
+@media (max-width: 1000px) { .rel-graficos { grid-template-columns: 1fr; } }
+.rel-graficos.hidden { display:none; }
+.rel-chart-card { background:var(--white); border:1.5px solid #e0ddd8; border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 18px; min-width:0; }
+.rel-chart-title { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--steel); }
+.rel-chart-sub { font-size:11px; color:var(--silver2); margin-bottom:12px; }
+.rel-legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:8px; font-size:11px; color:var(--silver3); }
+.rel-legend span { display:inline-flex; align-items:center; gap:5px; }
+.rel-legend i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+.rel-part-row { display:grid; grid-template-columns: minmax(90px,150px) 1fr 70px; gap:10px; align-items:center; margin-bottom:9px; font-size:12px; }
+.rel-part-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--steel); font-weight:500; }
+.rel-part-bar { height:14px; background:var(--off); border-radius:3px; overflow:hidden; display:flex; }
+.rel-part-bar div { height:100%; }
+.rel-part-num { text-align:right; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--silver3); white-space:nowrap; }
+.rel-empty { padding:30px; text-align:center; color:var(--silver); font-size:13px; }
+.rel-count { font-size:11.5px; color:var(--silver2); margin:0 0 8px 2px; }
+.rel-table thead th[data-sort] { cursor:pointer; user-select:none; white-space:nowrap; }
+.rel-table thead th[data-sort]:hover { color:var(--steel); }
+.rel-table thead th .sort-ind { font-size:9px; margin-left:4px; color:var(--bronze); }
+.rel-table .tag, .rel-table .action-btns .btn { white-space:nowrap; }
+.rel-motivo { font-size:10.5px; color:var(--silver3); margin-top:4px; max-width:260px; line-height:1.35; }
+.rel-motivo b { color:var(--red); font-weight:600; }
 </style>
 </head>
 <body>
@@ -1012,34 +1046,97 @@ tbody tr:hover td { background: #faf9f7; }
     <div class="page-header">
       <div>
         <div class="page-title">Relatório de Licitações</div>
-        <div class="page-subtitle">Licitações finalizadas e arquivadas</div>
+        <div class="page-subtitle">Acompanhamento, indicadores e histórico de resultados</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" class="form-input" style="max-width:240px" placeholder="Buscar licitação..." id="relatorioSearch" oninput="renderRelatorio()">
-        <select class="form-select" id="relatorioFiltroResultado" style="max-width:220px" onchange="renderRelatorio()">
-<option value="">Todas as licitações</option>
+        <button class="btn btn-ghost btn-sm" onclick="exportRelatorioCSV()" title="Exporta as licitações filtradas">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+          Exportar CSV
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="imprimirRelatorio()" title="Gera versão para impressão ou PDF">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Imprimir / PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="rel-filtros">
+      <div class="form-group">
+        <div class="form-label">Buscar</div>
+        <input type="text" class="form-input" placeholder="Licitação, órgão, ID..." id="relatorioSearch" oninput="renderRelatorio()">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Status / Resultado</div>
+        <select class="form-select" id="relatorioFiltroResultado" onchange="renderRelatorio()">
+          <option value="">Todas as licitações</option>
           <option value="__ativas__">▶ Em andamento (Kanban)</option>
           <option value="__arquivadas__">✓ Finalizadas / Arquivadas</option>
           <option value="Licitação Ganha">Licitação Ganha</option>
           <option value="Licitação Perdida">Licitação Perdida</option>
           <option value="Licitação Desabilitada">Licitação Desabilitada</option>
           <option value="Licitação Rejeitada pelo Cliente">Rejeitada pelo Cliente</option>
-          </select>
-        <button class="btn btn-ghost btn-sm" onclick="exportRelatorioCSV()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
-          Exportar CSV
-        </button>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Participante</div>
+        <select class="form-select" id="relFiltroCliente" onchange="renderRelatorio()">
+          <option value="">Todos os participantes</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Modalidade</div>
+        <select class="form-select" id="relFiltroModalidade" onchange="renderRelatorio()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Abertura de</div>
+        <input type="date" class="form-input" id="relDataIni" onchange="renderRelatorio()">
+      </div>
+      <div class="form-group">
+        <div class="form-label">até</div>
+        <input type="date" class="form-input" id="relDataFim" onchange="renderRelatorio()">
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="relLimparFiltros()">Limpar</button>
+    </div>
+
+    <!-- Indicadores -->
+    <div id="relatorio-stats" class="rel-kpis"></div>
+
+    <!-- Gráficos -->
+    <div class="rel-graficos-head">
+      <button class="btn btn-ghost btn-sm" id="relToggleGraficos" onclick="relToggleGraficos()">Ocultar gráficos</button>
+    </div>
+    <div id="relatorio-graficos" class="rel-graficos">
+      <div class="rel-chart-card">
+        <div class="rel-chart-title">Resultados por mês de abertura</div>
+        <div class="rel-chart-sub">Quantidade de licitações por situação</div>
+        <div id="rel_chart_mes"></div>
+      </div>
+      <div class="rel-chart-card">
+        <div class="rel-chart-title">Desempenho por participante</div>
+        <div class="rel-chart-sub">Licitações por situação · à direita: total · taxa de sucesso</div>
+        <div id="rel_chart_part"></div>
       </div>
     </div>
-    <div id="relatorio-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px"></div>
+
+    <div class="rel-count" id="relatorio-count"></div>
     <div class="table-card">
       <div style="overflow-x:auto">
-        <table>
+        <table class="rel-table">
           <thead>
-            <tr>
-              <th>ID</th><th>Licitação / Órgão</th><th>Modalidade</th>
-              <th>Etapa / Status</th><th>Participante</th><th>Nomeação</th>
-              <th>Valor Est.</th><th>Valor Final</th><th>Abertura</th><th>Ações</th>
+            <tr id="relatorio-thead">
+              <th data-sort="id" onclick="relOrdenar('id')">ID</th>
+              <th data-sort="title" onclick="relOrdenar('title')">Licitação / Órgão</th>
+              <th data-sort="modalidade" onclick="relOrdenar('modalidade')">Modalidade</th>
+              <th data-sort="status" onclick="relOrdenar('status')">Etapa / Status</th>
+              <th data-sort="participante" onclick="relOrdenar('participante')">Participante</th>
+              <th data-sort="nomeacao" onclick="relOrdenar('nomeacao')">Nomeação</th>
+              <th data-sort="valor" onclick="relOrdenar('valor')">Valor Est.</th>
+              <th data-sort="valorFinal" onclick="relOrdenar('valorFinal')">Valor Final</th>
+              <th data-sort="abertura" onclick="relOrdenar('abertura')">Abertura</th>
+              <th class="no-sort">Ações</th>
             </tr>
           </thead>
           <tbody id="relatorio-table-body"></tbody>
@@ -3819,156 +3916,550 @@ function desarquivarCard(cardId) {
 }
 
 // ═══════════════════════════════════════════════════════
-// RELATÓRIO DE LICITAÇÕES FINALIZADAS
+// RELATÓRIO DE LICITAÇÕES — filtros, indicadores, gráficos, impressão
 // ═══════════════════════════════════════════════════════
+var REL_CATS = {
+  ganha:        { label:'Ganha',          cor:'#2e7d52' },
+  perdida:      { label:'Perdida',        cor:'#c0392b' },
+  desabilitada: { label:'Desabilitada',   cor:'#8b929a' },
+  rejeitada:    { label:'Rejeitada pelo cliente', cor:'#d35400' },
+  andamento:    { label:'Em andamento',   cor:'#2d6fa3' },
+  finalizada:   { label:'Finalizada (outros)', cor:'#c0c5cc' }
+};
+var REL_CAT_ORDEM = ['ganha','perdida','desabilitada','rejeitada','andamento','finalizada'];
+var REL_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+var relSort = { key:null, dir:1 };
+var relGraficosVisiveis = (function(){ try { return localStorage.getItem('tbc_lf_rel_graficos') !== '0'; } catch(e) { return true; } })();
+
+// Resultado efetivo: o status do pregão tem prioridade sobre o campo "resultado"
+function relOutcome(c) {
+  var rp = c.respostaPregao;
+  if (rp && rp.status==='ganha')        return 'Licitação Ganha';
+  if (rp && rp.status==='perdida')      return 'Licitação Perdida';
+  if (rp && rp.status==='desabilitada') return 'Licitação Desabilitada';
+  if (c.resultado) return resultadoLabel(c.resultado);
+  return c.arquivado ? 'Finalizada' : '';
+}
+function relCategoria(c) {
+  var o = relOutcome(c);
+  if (o==='Licitação Ganha') return 'ganha';
+  if (o==='Licitação Perdida') return 'perdida';
+  if (o==='Licitação Desabilitada') return 'desabilitada';
+  if (o==='Licitação Rejeitada pelo Cliente') return 'rejeitada';
+  return c.arquivado ? 'finalizada' : 'andamento';
+}
+function relValorFinal(c) {
+  var rp = c.respostaPregao;
+  if (rp && rp.status==='ganha')   return Number(rp.valorGanho)||0;
+  if (rp && rp.status==='perdida') return Number(rp.valorProposta)||0;
+  return null;
+}
+// Motivo / observação do resultado (rejeição, desabilitação, vencedor)
+function relMotivo(c) {
+  var cat = relCategoria(c);
+  if (cat==='rejeitada') {
+    var rn = c.respostaNomeacao || {};
+    return { tipo:'Motivo da rejeição', texto: rn.motivo || '', data: rn.dataResposta || c.dataArquivamento || '' };
+  }
+  if (cat==='desabilitada') {
+    var rp = c.respostaPregao || {};
+    return { tipo:'Motivo da desabilitação', texto: rp.motivo || '', data: c.dataArquivamento || '' };
+  }
+  if (cat==='perdida') {
+    var rp2 = c.respostaPregao || {};
+    return rp2.concorrente ? { tipo:'Vencedor', texto: rp2.concorrente, data:'' } : null;
+  }
+  return null;
+}
+function relNomeacao(c) {
+  if (!c.clienteId) return '';
+  var rn = c.respostaNomeacao;
+  if (rn && rn.status==='aprovado')  return 'aprovado';
+  if (rn && rn.status==='rejeitado') return 'rejeitado';
+  return 'pendente';
+}
+function relFmtV(v) { return (v===null || v===undefined || v==='' || isNaN(Number(v))) ? '—' : fmt(v); }
+function relFmtMes(ym) { var p = ym.split('-'); return REL_MESES[Number(p[1])-1]+'/'+p[0].slice(2); }
+
+function relVal(id) { return ((document.getElementById(id)||{}).value||''); }
+
+function relPopularFiltros() {
+  var selC = document.getElementById('relFiltroCliente');
+  if (selC) {
+    var cur = selC.value;
+    var clientes = (db.clients||[]).slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','pt-BR'); });
+    selC.innerHTML = '<option value="">Todos os participantes</option>'
+      + clientes.map(function(c){
+          return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name||'')+(c.company?' ('+escapeHtml(c.company)+')':'')+(c.active===false?' — inativo':'')+'</option>';
+        }).join('')
+      + '<option value="__sem__">Sem participante</option>';
+    selC.value = cur;
+  }
+  var selM = document.getElementById('relFiltroModalidade');
+  if (selM) {
+    var curM = selM.value;
+    var mods = MODALIDADES.slice();
+    db.cards.forEach(function(c){ if (c.modalidade && mods.indexOf(c.modalidade)<0) mods.push(c.modalidade); });
+    selM.innerHTML = '<option value="">Todas</option>' + mods.map(function(m){ return '<option>'+escapeHtml(m)+'</option>'; }).join('');
+    selM.value = curM;
+  }
+}
+
+function relFiltrosAtivos() {
+  return {
+    q:          relVal('relatorioSearch').toLowerCase().trim(),
+    resultado:  relVal('relatorioFiltroResultado'),
+    cliente:    relVal('relFiltroCliente'),
+    modalidade: relVal('relFiltroModalidade'),
+    ini:        relVal('relDataIni'),
+    fim:        relVal('relDataFim')
+  };
+}
+
+function relFiltrar() {
+  var f = relFiltrosAtivos();
+  return db.cards.filter(function(c) {
+    if (f.q && !(c.title||'').toLowerCase().includes(f.q)
+           && !(c.entity||'').toLowerCase().includes(f.q)
+           && !(c.id||'').toLowerCase().includes(f.q)
+           && !relOutcome(c).toLowerCase().includes(f.q)) return false;
+    if (f.resultado === '__ativas__')     { if (c.arquivado) return false; }
+    else if (f.resultado === '__arquivadas__') { if (!c.arquivado) return false; }
+    else if (f.resultado && relOutcome(c) !== f.resultado) return false;
+    if (f.cliente === '__sem__') { if (c.clienteId) return false; }
+    else if (f.cliente && c.clienteId !== f.cliente) return false;
+    if (f.modalidade && c.modalidade !== f.modalidade) return false;
+    if ((f.ini || f.fim) && !c.dataAbertura) return false;
+    if (f.ini && c.dataAbertura < f.ini) return false;
+    if (f.fim && c.dataAbertura > f.fim) return false;
+    return true;
+  });
+}
+
+function relOrdenarLista(lista) {
+  var colOrder = { captacao:0, nomeacao:1, pregao:2, resultado:3 };
+  if (!relSort.key) {
+    return lista.sort(function(a, b) {
+      if (!!a.arquivado !== !!b.arquivado) return a.arquivado ? 1 : -1;
+      return (colOrder[a.col]||0) - (colOrder[b.col]||0);
+    });
+  }
+  var nomOrd = { aprovado:0, pendente:1, rejeitado:2, '':3 };
+  var getter = {
+    id:           function(c){ return c.id||''; },
+    title:        function(c){ return (c.title||'').toLowerCase(); },
+    modalidade:   function(c){ return (c.modalidade||'').toLowerCase(); },
+    status:       function(c){ var k = relCategoria(c); return k==='andamento' ? 10+(colOrder[c.col]||0) : REL_CAT_ORDEM.indexOf(k); },
+    participante: function(c){ return c.clienteId ? clientName(c.clienteId).toLowerCase() : '￿'; },
+    nomeacao:     function(c){ return nomOrd[relNomeacao(c)]; },
+    valor:        function(c){ return Number(c.valor)||0; },
+    valorFinal:   function(c){ var v = relValorFinal(c); return v===null ? -1 : v; },
+    abertura:     function(c){ return c.dataAbertura || ''; }
+  }[relSort.key];
+  var dir = relSort.dir;
+  return lista.sort(function(a, b) {
+    var va = getter(a), vb = getter(b);
+    // vazios sempre no fim
+    if (relSort.key==='abertura' && (!va || !vb) && va !== vb) return va ? -1 : 1;
+    var r = (typeof va === 'number' && typeof vb === 'number') ? va - vb
+          : String(va).localeCompare(String(vb), 'pt-BR', { numeric:true });
+    return r * dir;
+  });
+}
+
+function relOrdenar(key) {
+  var dirInicial = (key==='valor'||key==='valorFinal'||key==='abertura') ? -1 : 1; // valores/datas: maior primeiro
+  if (relSort.key === key) {
+    if (relSort.dir === dirInicial) relSort.dir = -dirInicial;
+    else { relSort.key = null; relSort.dir = 1; } // 3º clique volta à ordem padrão
+  } else { relSort.key = key; relSort.dir = dirInicial; }
+  renderRelatorio();
+}
+
+function relLimparFiltros() {
+  ['relatorioSearch','relatorioFiltroResultado','relFiltroCliente','relFiltroModalidade','relDataIni','relDataFim']
+    .forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+  renderRelatorio();
+}
+
+function relToggleGraficos() {
+  relGraficosVisiveis = !relGraficosVisiveis;
+  try { localStorage.setItem('tbc_lf_rel_graficos', relGraficosVisiveis ? '1' : '0'); } catch(e) {}
+  renderRelatorio();
+}
+
+// ── Indicadores ──
+function relCalcIndicadores(lista) {
+  var k = { total:lista.length, andamento:0, finalizadas:0, ganha:0, perdida:0, desabilitada:0, rejeitada:0,
+            valorEst:0, valorGanho:0, valorEstGanhas:0, nomRespondidas:0 };
+  lista.forEach(function(c) {
+    var cat = relCategoria(c);
+    if (c.arquivado) k.finalizadas++; else k.andamento++;
+    if (k[cat] !== undefined && cat!=='andamento' && cat!=='finalizada') k[cat]++;
+    k.valorEst += Number(c.valor)||0;
+    if (cat==='ganha') { k.valorGanho += relValorFinal(c)||0; k.valorEstGanhas += Number(c.valor)||0; }
+    var rn = relNomeacao(c);
+    if (rn==='aprovado' || rn==='rejeitado') k.nomRespondidas++;
+  });
+  k.disputadas = k.ganha + k.perdida + k.desabilitada;
+  k.taxa = k.disputadas ? (k.ganha / k.disputadas * 100) : null;
+  k.pctGanhoEst = k.valorEstGanhas ? (k.valorGanho / k.valorEstGanhas * 100) : null;
+  return k;
+}
+function relPct(v) { return v===null ? '—' : v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%'; }
+
+function relKpisHtml(k) {
+  return [
+    { label:'Licitações',      val:k.total,  sub:k.andamento+' em andamento · '+k.finalizadas+' finalizadas', cor:'var(--steel)' },
+    { label:'Ganhas',          val:k.ganha,  sub:k.perdida+' perdidas · '+k.desabilitada+' desabilitadas', cor:'var(--green)' },
+    { label:'Taxa de sucesso', val:relPct(k.taxa), sub:k.disputadas ? 'sobre '+k.disputadas+' com resultado' : 'sem resultados ainda', cor:'var(--green)' },
+    { label:'Rejeitadas pelo cliente', val:k.rejeitada, sub:k.nomRespondidas ? 'de '+k.nomRespondidas+' nomeações respondidas' : 'nenhuma nomeação respondida', cor:'var(--orange)' },
+    { label:'Valor estimado',  val:fmt(k.valorEst), sub:'soma das licitações filtradas', cor:'var(--bronze)' },
+    { label:'Valor ganho',     val:fmt(k.valorGanho), sub:k.pctGanhoEst===null ? 'nenhuma ganha' : relPct(k.pctGanhoEst)+' do estimado das ganhas', cor:'var(--green)' }
+  ].map(function(s){
+    return '<div class="rel-kpi"><div class="rel-kpi-label">'+s.label+'</div>'
+      +'<div class="rel-kpi-val" style="color:'+s.cor+'" title="'+escapeHtml(String(s.val))+'">'+s.val+'</div>'
+      +'<div class="rel-kpi-sub">'+s.sub+'</div></div>';
+  }).join('');
+}
+
+// ── Gráfico: resultados por mês (barras empilhadas, SVG) ──
+function relChartMesHtml(lista) {
+  var porMes = {}, semData = 0;
+  lista.forEach(function(c) {
+    if (!c.dataAbertura || c.dataAbertura.length < 7) { semData++; return; }
+    var ym = c.dataAbertura.slice(0,7);
+    if (!porMes[ym]) porMes[ym] = {};
+    var cat = relCategoria(c);
+    porMes[ym][cat] = (porMes[ym][cat]||0) + 1;
+  });
+  var chaves = Object.keys(porMes).sort();
+  if (!chaves.length) return '<div class="rel-empty">Sem licitações com data de abertura no filtro.</div>';
+  // Preenche meses vazios entre o primeiro e o último
+  var meses = [], y = Number(chaves[0].slice(0,4)), m = Number(chaves[0].slice(5,7));
+  var ultimo = chaves[chaves.length-1];
+  while (true) {
+    var ym = y+'-'+(m<10?'0'+m:m);
+    meses.push(ym);
+    if (ym >= ultimo || meses.length > 240) break;
+    m++; if (m>12) { m=1; y++; }
+  }
+  var cortado = false;
+  if (meses.length > 12) { meses = meses.slice(-12); cortado = true; }
+  var cats = REL_CAT_ORDEM.filter(function(k){ return meses.some(function(ym){ return porMes[ym] && porMes[ym][k]; }); });
+  var max = 0;
+  meses.forEach(function(ym){
+    var t = 0; cats.forEach(function(k){ t += (porMes[ym]&&porMes[ym][k])||0; }); if (t>max) max=t;
+  });
+  var W = 560, H = 210, padL = 28, padR = 8, padT = 14, padB = 26;
+  var plotW = W-padL-padR, plotH = H-padT-padB;
+  var passo = max <= 5 ? 1 : max <= 10 ? 2 : Math.ceil(max/5);
+  var topo = Math.ceil(max/passo)*passo || 1;
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:100%;height:auto;max-height:250px;display:block" font-family="IBM Plex Sans, Arial, sans-serif">';
+  for (var t = 0; t <= topo; t += passo) {
+    var gy = padT + plotH - (t/topo)*plotH;
+    svg += '<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+gy+'" y2="'+gy+'" stroke="#ebe8e3" stroke-width="1"/>'
+      + '<text x="'+(padL-6)+'" y="'+(gy+3)+'" font-size="9" fill="#8b929a" text-anchor="end">'+t+'</text>';
+  }
+  var slot = plotW / meses.length, bw = Math.min(34, slot*0.62);
+  meses.forEach(function(ym, i) {
+    var x = padL + slot*i + (slot-bw)/2, acc = 0, total = 0, tip = relFmtMes(ym)+':';
+    cats.forEach(function(k) {
+      var v = (porMes[ym]&&porMes[ym][k])||0;
+      if (!v) return;
+      var h = (v/topo)*plotH, yy = padT + plotH - ((acc+v)/topo)*plotH;
+      svg += '<rect x="'+x.toFixed(1)+'" y="'+yy.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(h-1,1).toFixed(1)+'" rx="2" fill="'+REL_CATS[k].cor+'"><title>'+relFmtMes(ym)+' · '+REL_CATS[k].label+': '+v+'</title></rect>';
+      acc += v; total += v;
+    });
+    if (total) svg += '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(padT + plotH - (total/topo)*plotH - 4).toFixed(1)+'" font-size="9.5" font-weight="600" fill="#4a5057" text-anchor="middle">'+total+'</text>';
+    svg += '<text x="'+(padL + slot*i + slot/2).toFixed(1)+'" y="'+(H-8)+'" font-size="9.5" fill="#8b929a" text-anchor="middle">'+relFmtMes(ym)+'</text>';
+  });
+  svg += '</svg>';
+  var legenda = '<div class="rel-legend">' + cats.map(function(k){ return '<span><i style="background:'+REL_CATS[k].cor+'"></i>'+REL_CATS[k].label+'</span>'; }).join('') + '</div>';
+  var nota = [];
+  if (cortado) nota.push('exibindo os 12 meses mais recentes');
+  if (semData) nota.push(semData+' sem data de abertura');
+  return svg + legenda + (nota.length ? '<div class="rel-kpi-sub" style="margin-top:6px">'+nota.join(' · ')+'</div>' : '');
+}
+
+// ── Gráfico: desempenho por participante (barras horizontais, HTML) ──
+function relChartPartHtml(lista) {
+  var grupos = {};
+  lista.forEach(function(c) {
+    var key = c.clienteId || '__sem__';
+    if (!grupos[key]) grupos[key] = { nome: c.clienteId ? clientName(c.clienteId) : 'Sem participante', total:0 };
+    var g = grupos[key], cat = relCategoria(c);
+    g.total++; g[cat] = (g[cat]||0) + 1;
+  });
+  var arr = Object.keys(grupos).map(function(k){ return grupos[k]; })
+    .sort(function(a,b){ return b.total - a.total || a.nome.localeCompare(b.nome,'pt-BR'); });
+  if (!arr.length) return '<div class="rel-empty">Sem dados para o filtro.</div>';
+  var extra = arr.length > 8 ? arr.length - 8 : 0;
+  arr = arr.slice(0, 8);
+  var max = arr[0].total;
+  var usadas = {};
+  var linhas = arr.map(function(g) {
+    var disp = (g.ganha||0)+(g.perdida||0)+(g.desabilitada||0);
+    var taxa = disp ? Math.round((g.ganha||0)/disp*100)+'%' : '—';
+    var segs = REL_CAT_ORDEM.map(function(k){
+      if (!g[k]) return '';
+      usadas[k] = true;
+      return '<div style="width:'+(g[k]/max*100).toFixed(2)+'%;background:'+REL_CATS[k].cor+'" title="'+REL_CATS[k].label+': '+g[k]+'"></div>';
+    }).join('');
+    return '<div class="rel-part-row"><div class="rel-part-name" title="'+escapeHtml(g.nome)+'">'+escapeHtml(g.nome)+'</div>'
+      +'<div class="rel-part-bar">'+segs+'</div>'
+      +'<div class="rel-part-num" title="'+(g.ganha||0)+' ganha(s) de '+disp+' com resultado">'+g.total+' · '+taxa+'</div></div>';
+  }).join('');
+  var legenda = '<div class="rel-legend">' + REL_CAT_ORDEM.filter(function(k){ return usadas[k]; })
+    .map(function(k){ return '<span><i style="background:'+REL_CATS[k].cor+'"></i>'+REL_CATS[k].label+'</span>'; }).join('') + '</div>';
+  return linhas + legenda + (extra ? '<div class="rel-kpi-sub" style="margin-top:6px">+'+extra+' participante(s) não exibido(s)</div>' : '');
+}
+
 function renderRelatorio() {
   var tbody = document.getElementById('relatorio-table-body');
   var statsEl = document.getElementById('relatorio-stats');
   if (!tbody) return;
 
-  var q = ((document.getElementById('relatorioSearch')||{}).value||'').toLowerCase();
-  var filtroRes = ((document.getElementById('relatorioFiltroResultado')||{}).value||'');
+  relPopularFiltros();
+  var todas = relOrdenarLista(relFiltrar());
+  var k = relCalcIndicadores(todas);
 
-  // Todas as licitações — ativas + arquivadas
-  var todas = db.cards.filter(function(c) {
-    if (q && !(c.title||'').toLowerCase().includes(q)
-          && !(c.entity||'').toLowerCase().includes(q)
-          && !(c.id||'').toLowerCase().includes(q)
-          && !(c.resultado||'').toLowerCase().includes(q)) return false;
-    if (filtroRes === '__ativas__')     return !c.arquivado;
-    if (filtroRes === '__arquivadas__') return !!c.arquivado;
-    if (filtroRes) {
-      var res = c.resultado || '';
-      if (res.toLowerCase() !== filtroRes.toLowerCase()) return false;
+  if (statsEl) statsEl.innerHTML = relKpisHtml(k);
+
+  var gWrap = document.getElementById('relatorio-graficos');
+  var gBtn  = document.getElementById('relToggleGraficos');
+  if (gWrap) {
+    gWrap.classList.toggle('hidden', !relGraficosVisiveis);
+    if (gBtn) gBtn.textContent = relGraficosVisiveis ? 'Ocultar gráficos' : 'Mostrar gráficos';
+    if (relGraficosVisiveis) {
+      var cm = document.getElementById('rel_chart_mes');  if (cm) cm.innerHTML = relChartMesHtml(todas);
+      var cp = document.getElementById('rel_chart_part'); if (cp) cp.innerHTML = relChartPartHtml(todas);
     }
-    return true;
+  }
+
+  // Indicador de ordenação nos cabeçalhos
+  var ths = document.querySelectorAll('#relatorio-thead th[data-sort]');
+  Array.prototype.forEach.call(ths, function(th) {
+    var ind = th.querySelector('.sort-ind');
+    if (ind) ind.remove();
+    if (th.getAttribute('data-sort') === relSort.key) {
+      th.insertAdjacentHTML('beforeend', '<span class="sort-ind">'+(relSort.dir===1?'▲':'▼')+'</span>');
+    }
   });
 
-  // Stats gerais (sobre o banco todo)
-  var totalGeral = db.cards.length;
-  var ativas     = db.cards.filter(function(c){ return !c.arquivado; }).length;
-  var arquivadas = db.cards.filter(function(c){ return !!c.arquivado; }).length;
-  var ganhas     = db.cards.filter(function(c){ return (c.respostaPregao&&c.respostaPregao.status==='ganha')||(c.resultado==='Licitação Ganha'); }).length;
-  var valorTotal = db.cards.reduce(function(acc,c){ return acc+((c.respostaPregao&&c.respostaPregao.valorGanho)||0); }, 0);
-
-  if (statsEl) {
-    statsEl.innerHTML = [
-      { dot:'var(--blue)',    count:totalGeral, label:'Total' },
-      { dot:'var(--bronze)',  count:ativas,     label:'Em andamento' },
-      { dot:'var(--silver2)', count:arquivadas, label:'Finalizadas' },
-      { dot:'var(--green)',   count:ganhas,     label:'Ganhas' },
-    ].map(function(s){
-      return '<div class="stat-pill"><div class="dot" style="background:'+s.dot+'"></div>'
-        +'<span class="count">'+s.count+'</span><span class="label">'+s.label+'</span></div>';
-    }).join('') + (valorTotal>0?'<div class="stats-total">Ganhos: '+fmt(valorTotal)+'</div>':'');
-  }
+  var countEl = document.getElementById('relatorio-count');
+  if (countEl) countEl.textContent = todas.length + ' de ' + db.cards.length + ' licitações' + (todas.length !== db.cards.length ? ' (filtradas)' : '');
 
   if (!todas.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--silver);padding:32px">Nenhuma licitação encontrada.</td></tr>';
     return;
   }
 
-  // Ordenar: ativas primeiro (por etapa), arquivadas por último
-  var colOrder = { captacao:0, nomeacao:1, pregao:2, resultado:3 };
-  todas.sort(function(a, b) {
-    if (!!a.arquivado !== !!b.arquivado) return a.arquivado ? 1 : -1;
-    return (colOrder[a.col]||0) - (colOrder[b.col]||0);
-  });
+  var olhoSvg = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 
   tbody.innerHTML = todas.map(function(c) {
     var isArquivada = !!c.arquivado;
     var colColor = COL_COLORS[c.col] || 'var(--silver2)';
+    var cid = escapeHtml(c.id);
 
     // Coluna Etapa / Status
     var etapaHtml;
-    if (isArquivada) {
-      var rp = c.respostaPregao;
-      var outcomeLabel = c.resultado || 'Finalizada';
-      var outcomeCss   = resultadoCss(c.resultado || '');
-      if (rp) {
-        if (rp.status==='ganha')        { outcomeLabel='Licitação Ganha';        outcomeCss='ganhou';   }
-        if (rp.status==='perdida')      { outcomeLabel='Licitação Perdida';       outcomeCss='perdeu';   }
-        if (rp.status==='desabilitada') { outcomeLabel='Licitação Desabilitada';  outcomeCss='cancelado';}
-      }
-      etapaHtml = '<span class="tag tag-'+outcomeCss+'" style="white-space:nowrap">'+outcomeLabel+'</span>'
-        +(c.dataArquivamento?'<div style="font-size:10px;color:var(--silver2);margin-top:3px">'+c.dataArquivamento+'</div>':'');
+    var outcome = relOutcome(c);
+    if (isArquivada || (outcome && outcome !== 'Licitação Suspensa' && outcome !== 'Licitação em Aberto')) {
+      etapaHtml = '<span class="tag tag-'+resultadoCss(outcome)+'" style="white-space:nowrap">'+escapeHtml(outcome || 'Finalizada')+'</span>'
+        +(c.dataArquivamento?'<div style="font-size:10px;color:var(--silver2);margin-top:3px">'+escapeHtml(c.dataArquivamento)+'</div>':'');
     } else {
       etapaHtml = '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:4px;'
         +'font-size:10px;font-weight:600;background:'+colColor+'18;color:'+colColor+';'
         +'border:1px solid '+colColor+'33;white-space:nowrap">'
         +'<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>'
-        +colLabel(c.col)+'</span>';
+        +colLabel(c.col)+'</span>'
+        +(outcome ? '<div style="font-size:10px;color:var(--silver2);margin-top:3px">'+escapeHtml(outcome)+'</div>' : '');
     }
-
-    // Valor final
-    var rp2 = c.respostaPregao;
-    var valorFinal = '—';
-    if (rp2 && rp2.status==='ganha')   valorFinal = fmt(rp2.valorGanho||0);
-    if (rp2 && rp2.status==='perdida') valorFinal = fmt(rp2.valorProposta||0);
+    var mot = relMotivo(c);
+    if (mot && mot.texto) {
+      etapaHtml += '<div class="rel-motivo">'+(mot.tipo==='Vencedor' ? 'Vencedor: ' : '<b>Motivo:</b> ')+escapeHtml(mot.texto)+'</div>';
+    }
 
     // Resposta de Nomeação
-    var nomeacaoHtml = '—';
-    if (c.clienteId) {
-      var rn = c.respostaNomeacao;
-      if (rn && rn.status==='aprovado')
-        nomeacaoHtml = '<span class="tag tag-ganhou" style="font-size:10px">✓ Aprovado</span>';
-      else if (rn && rn.status==='rejeitado')
-        nomeacaoHtml = '<span class="tag tag-perdeu" style="font-size:10px">✕ Rejeitado</span>';
-      else
-        nomeacaoHtml = '<span style="font-size:11px;color:var(--silver2)">⏳ Pendente</span>';
-    }
+    var nom = relNomeacao(c), nomeacaoHtml = '—';
+    if (nom==='aprovado')       nomeacaoHtml = '<span class="tag tag-ganhou" style="font-size:10px">✓ Aprovado</span>';
+    else if (nom==='rejeitado') nomeacaoHtml = '<span class="tag tag-perdeu" style="font-size:10px">✕ Rejeitado</span>';
+    else if (nom==='pendente')  nomeacaoHtml = '<span style="font-size:11px;color:var(--silver2)">⏳ Pendente</span>';
 
     return '<tr style="'+(isArquivada?'opacity:0.85':'')+'">'
-      +'<td style="font-family:IBM Plex Mono,monospace;font-size:11px;white-space:nowrap">'+c.id+'</td>'
+      +'<td style="font-family:IBM Plex Mono,monospace;font-size:11px;white-space:nowrap">'+cid+'</td>'
       +'<td><div style="font-weight:600;font-size:13px">'+escapeHtml(c.title)+'</div>'
         +'<div style="font-size:10px;color:var(--silver2)">'+escapeHtml(c.entity)+'</div></td>'
-      +'<td style="font-size:11px">'+c.modalidade+'</td>'
+      +'<td style="font-size:11px">'+escapeHtml(c.modalidade||'—')+'</td>'
       +'<td>'+etapaHtml+'</td>'
-      +'<td style="font-size:12px">'+clientName(c.clienteId)+'</td>'
+      +'<td style="font-size:12px">'+escapeHtml(clientName(c.clienteId))+'</td>'
       +'<td>'+nomeacaoHtml+'</td>'
-      +'<td style="font-family:IBM Plex Mono,monospace;font-size:12px;white-space:nowrap">'+fmt(c.valor)+'</td>'
-      +'<td style="font-family:IBM Plex Mono,monospace;font-size:12px;white-space:nowrap">'+valorFinal+'</td>'
+      +'<td style="font-family:IBM Plex Mono,monospace;font-size:12px;white-space:nowrap">'+relFmtV(c.valor)+'</td>'
+      +'<td style="font-family:IBM Plex Mono,monospace;font-size:12px;white-space:nowrap">'+relFmtV(relValorFinal(c))+'</td>'
       +'<td style="font-size:11px;white-space:nowrap">'+fmtDate(c.dataAbertura)+'</td>'
       +'<td><div class="action-btns">'
-        +(isArquivada
-  ? '<button class="btn btn-ghost btn-sm" onclick="openDetailModal(\''+c.id+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver</button>'
-    +'<button class="btn btn-ghost btn-sm" onclick="desarquivarCard(\''+c.id+'\')">↩ Reabrir</button>'
-  : '<button class="btn btn-ghost btn-sm" onclick="openDetailModal(\''+c.id+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver</button>'
-)
+        +'<button class="btn btn-ghost btn-sm" onclick="openDetailModal(\''+cid+'\')">'+olhoSvg+' Ver</button>'
+        +(isArquivada && canEdit() ? '<button class="btn btn-ghost btn-sm" onclick="desarquivarCard(\''+cid+'\')">↩ Reabrir</button>' : '')
         +'</div></td>'
       +'</tr>';
   }).join('');
 }
-  
+
+function relDescricaoFiltros() {
+  var f = relFiltrosAtivos(), partes = [];
+  if (f.resultado) {
+    var sel = document.getElementById('relatorioFiltroResultado');
+    partes.push('Status: ' + (sel && sel.selectedIndex>=0 ? sel.options[sel.selectedIndex].text.replace(/^[▶✓]\s*/,'') : f.resultado));
+  }
+  if (f.cliente)    partes.push('Participante: ' + (f.cliente==='__sem__' ? 'Sem participante' : clientName(f.cliente)));
+  if (f.modalidade) partes.push('Modalidade: ' + f.modalidade);
+  if (f.ini || f.fim) partes.push('Abertura: ' + (f.ini ? fmtDate(f.ini) : 'início') + ' a ' + (f.fim ? fmtDate(f.fim) : 'hoje'));
+  if (f.q)          partes.push('Busca: "' + relVal('relatorioSearch').trim() + '"');
+  return partes.length ? partes.join(' · ') : 'Todas as licitações';
+}
+
 function exportRelatorioCSV() {
-  var archived = db.cards.slice(); // Exporta TODAS as licitações (ativas + arquivadas)
-  if (!archived.length) { toast('Nenhuma licitação arquivada para exportar.', 'info'); return; }
-  var rows = [['ID','Título','Órgão/Entidade','Modalidade','Tipo','Participante','Etapa','Resultado','Valor Estimado','Valor Final','Abertura','Data Arquivamento']];
-  archived.forEach(function(c) {
-    var rp = c.respostaPregao;
-    var outcome = c.resultado || '';
-    var valorFinal = '';
-    if (rp) {
-      if (rp.status==='ganha')   { outcome='Licitação Ganha'; valorFinal=rp.valorGanho||''; }
-      if (rp.status==='perdida') { outcome='Licitação Perdida'; valorFinal=rp.valorProposta||''; }
-      if (rp.status==='desabilitada') { outcome='Licitação Desabilitada'; }
-    }
+  var lista = relOrdenarLista(relFiltrar());
+  if (!lista.length) { toast('Nenhuma licitação no filtro para exportar.', 'info'); return; }
+  var rows = [['ID','Título','Órgão/Entidade','Modalidade','Tipo','Participante','Etapa','Resultado','Nomeação','Valor Estimado','Valor Final','Abertura','Data Arquivamento','Motivo / Observação','Data da Resposta']];
+  lista.forEach(function(c) {
+    var vf = relValorFinal(c), mot = relMotivo(c), nom = relNomeacao(c);
     rows.push([
-c.id, c.title, c.entity, c.modalidade, c.tipo,
-      clientName(c.clienteId), (c.arquivado?'Finalizada':colLabel(c.col)), outcome, c.valor||'', valorFinal,
-      fmtDate(c.dataAbertura), c.dataArquivamento||''
+      c.id, c.title, c.entity, c.modalidade, c.tipo,
+      clientName(c.clienteId), (c.arquivado?'Finalizada':colLabel(c.col)), relOutcome(c),
+      nom ? nom.charAt(0).toUpperCase()+nom.slice(1) : '',
+      c.valor||'', vf===null ? '' : vf,
+      fmtDate(c.dataAbertura), c.dataArquivamento||'',
+      mot && mot.texto ? mot.tipo+': '+mot.texto : '', mot ? mot.data : ''
     ]);
   });
   var csv = rows.map(function(r){
-    return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(';');
+    return r.map(function(v){ return '"'+String(v===undefined||v===null?'':v).replace(/"/g,'""')+'"'; }).join(';');
   }).join('\n');
-  var BOM = '\uFEFF'; // BOM para Excel reconhecer UTF-8
+  var BOM = '﻿'; // BOM para Excel reconhecer UTF-8
   var blob = new Blob([BOM+csv], {type:'text/csv;charset=utf-8;'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'relatorio-licitaflow-'+new Date().toISOString().slice(0,10)+'.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  toast('Relatório CSV exportado!', 'success');
+  toast('Relatório CSV exportado ('+lista.length+' licitações)!', 'success');
+}
+
+// ── Relatório para impressão / PDF ──
+function relMontarImpressao() {
+  var lista = relOrdenarLista(relFiltrar());
+  var k = relCalcIndicadores(lista);
+  var agora = new Date();
+  var emitido = agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  var autor = (currentUser && currentUser.name) ? currentUser.name : '';
+
+  var kpis = [
+    ['Licitações', k.total, k.andamento+' em andamento · '+k.finalizadas+' finalizadas'],
+    ['Ganhas', k.ganha, k.perdida+' perdidas · '+k.desabilitada+' desabilitadas'],
+    ['Taxa de sucesso', relPct(k.taxa), k.disputadas ? 'sobre '+k.disputadas+' com resultado' : 'sem resultados'],
+    ['Rejeitadas pelo cliente', k.rejeitada, k.nomRespondidas ? 'de '+k.nomRespondidas+' nomeações respondidas' : '—'],
+    ['Valor estimado', fmt(k.valorEst), 'soma do filtro'],
+    ['Valor ganho', fmt(k.valorGanho), k.pctGanhoEst===null ? '—' : relPct(k.pctGanhoEst)+' do estimado das ganhas']
+  ].map(function(x){ return '<div class="kpi"><div class="kl">'+x[0]+'</div><div class="kv">'+x[1]+'</div><div class="ks">'+x[2]+'</div></div>'; }).join('');
+
+  var linhas = lista.map(function(c) {
+    var mot = relMotivo(c), outcome = relOutcome(c);
+    var situacao = outcome || colLabel(c.col);
+    if (!c.arquivado && outcome && outcome!==colLabel(c.col)) situacao = colLabel(c.col)+' — '+outcome;
+    var cat = relCategoria(c);
+    var obs = mot && mot.texto ? '<b>'+escapeHtml(mot.tipo)+':</b> '+escapeHtml(mot.texto) : '';
+    return '<tr>'
+      +'<td class="mono">'+escapeHtml(c.id)+'</td>'
+      +'<td><div class="t">'+escapeHtml(c.title)+'</div><div class="s">'+escapeHtml(c.entity)+'</div></td>'
+      +'<td>'+escapeHtml(c.modalidade||'—')+'</td>'
+      +'<td>'+escapeHtml(clientName(c.clienteId))+'</td>'
+      +'<td class="nw">'+fmtDate(c.dataAbertura)+'</td>'
+      +'<td><span class="st" style="border-color:'+REL_CATS[cat].cor+';color:'+REL_CATS[cat].cor+'">'+escapeHtml(situacao)+'</span>'
+        +(c.dataArquivamento ? '<div class="s">'+escapeHtml(c.dataArquivamento)+'</div>' : '')+'</td>'
+      +'<td class="num">'+relFmtV(c.valor)+'</td>'
+      +'<td class="num">'+relFmtV(relValorFinal(c))+'</td>'
+      +'<td class="obs">'+obs+'</td>'
+      +'</tr>';
+  }).join('');
+
+  var rejeitadas = lista.filter(function(c){ return relCategoria(c)==='rejeitada'; });
+  var secRej = '';
+  if (rejeitadas.length) {
+    secRej = '<h2>Rejeições pelo cliente — motivos informados</h2>'
+      +'<table class="rej"><thead><tr><th>ID</th><th>Licitação / Órgão</th><th>Participante</th><th>Data</th><th>Motivo da rejeição</th></tr></thead><tbody>'
+      + rejeitadas.map(function(c){
+          var m = relMotivo(c) || {};
+          return '<tr><td class="mono">'+escapeHtml(c.id)+'</td>'
+            +'<td><div class="t">'+escapeHtml(c.title)+'</div><div class="s">'+escapeHtml(c.entity)+'</div></td>'
+            +'<td>'+escapeHtml(clientName(c.clienteId))+'</td>'
+            +'<td class="nw">'+escapeHtml(m.data||'—')+'</td>'
+            +'<td class="motivo">'+(m.texto ? escapeHtml(m.texto) : '<span class="s">Motivo não informado</span>')+'</td></tr>';
+        }).join('')
+      +'</tbody></table>';
+  }
+
+  var css = '@page{size:A4 landscape;margin:11mm 10mm}'
+    +'*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'body{font-family:"IBM Plex Sans",Arial,Helvetica,sans-serif;color:#1e2228;font-size:10px;margin:0}'
+    +'.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #b87333;padding-bottom:8px;margin-bottom:10px}'
+    +'.hd img{width:46px;height:46px;object-fit:contain}'
+    +'.hd h1{font-size:18px;margin:0;color:#1e2228}.hd .meta{margin-left:auto;text-align:right;color:#4a5057;font-size:9.5px;line-height:1.5}'
+    +'.filtros{background:#f5f3ef;border-radius:4px;padding:6px 10px;margin-bottom:10px;color:#4a5057}'
+    +'.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}'
+    +'.kpi{border:1px solid #e0ddd8;border-radius:4px;padding:6px 8px}.kl{font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:#8b929a;font-weight:600}'
+    +'.kv{font-size:14px;font-weight:700;margin:2px 0}.ks{font-size:8.5px;color:#8b929a}'
+    +'.charts{display:grid;grid-template-columns:1.3fr 1fr;gap:10px;margin-bottom:12px;page-break-inside:avoid}'
+    +'.chart{border:1px solid #e0ddd8;border-radius:4px;padding:8px 10px}.chart h3{margin:0 0 6px;font-size:11px}'
+    +'.rel-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:8.5px;color:#4a5057}.rel-legend span{display:inline-flex;align-items:center;gap:4px}.rel-legend i{width:8px;height:8px;border-radius:2px;display:inline-block}'
+    +'.rel-part-row{display:grid;grid-template-columns:130px 1fr 70px;gap:8px;align-items:center;margin-bottom:5px;font-size:9px}'
+    +'.rel-part-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rel-part-bar{height:10px;background:#f5f3ef;border-radius:2px;overflow:hidden;display:flex}.rel-part-bar div{height:100%}'
+    +'.rel-part-num{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:8.5px}.rel-kpi-sub{font-size:8.5px;color:#8b929a}.rel-empty{padding:16px;text-align:center;color:#8b929a}'
+    +'h2{font-size:12.5px;margin:14px 0 6px;color:#1e2228;border-left:3px solid #b87333;padding-left:6px}'
+    +'table{width:100%;border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}'
+    +'th{background:#f5f3ef;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:#4a5057;padding:5px 6px;border-bottom:1px solid #d8d4cd}'
+    +'td{padding:5px 6px;border-bottom:1px solid #ebe8e3;vertical-align:top}'
+    +'.mono{font-family:"IBM Plex Mono",monospace;font-size:9px;white-space:nowrap}.nw{white-space:nowrap}.num{white-space:nowrap;text-align:right;font-family:"IBM Plex Mono",monospace}'
+    +'.t{font-weight:600}.s{font-size:8.5px;color:#8b929a}.st{display:inline-block;border:1px solid;border-radius:3px;padding:1px 5px;font-size:8.5px;font-weight:600;white-space:nowrap}'
+    +'.obs{font-size:9px;max-width:220px}.obs b{color:#4a5057}.motivo{font-size:10px;line-height:1.4}'
+    +'.rodape{margin-top:14px;font-size:8.5px;color:#8b929a;text-align:center}';
+
+  var graficos = relGraficosVisiveis
+    ? '<div class="charts"><div class="chart"><h3>Resultados por mês de abertura</h3>'+relChartMesHtml(lista)+'</div>'
+      +'<div class="chart"><h3>Desempenho por participante <span class="s">(total · taxa de sucesso)</span></h3>'+relChartPartHtml(lista)+'</div></div>'
+    : '';
+
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Licitações — TBC</title><style>'+css+'</style></head><body>'
+    +'<div class="hd"><img src="'+LOGO_B64+'" alt="TBC"><div><h1>Relatório de Licitações</h1><div class="s">Thor Business Consulting · LicitaFlow</div></div>'
+    +'<div class="meta">Emitido em '+emitido+(autor ? '<br>por '+escapeHtml(autor) : '')+'<br>'+lista.length+' licitação(ões)</div></div>'
+    +'<div class="filtros"><b>Filtros:</b> '+escapeHtml(relDescricaoFiltros())+'</div>'
+    +'<div class="kpis">'+kpis+'</div>'
+    + graficos
+    +'<h2>Licitações</h2>'
+    +(lista.length
+      ? '<table><thead><tr><th>ID</th><th>Licitação / Órgão</th><th>Modalidade</th><th>Participante</th><th>Abertura</th><th>Situação</th><th style="text-align:right">Valor est.</th><th style="text-align:right">Valor final</th><th>Motivo / Observação</th></tr></thead><tbody>'+linhas+'</tbody></table>'
+      : '<div class="rel-empty">Nenhuma licitação no filtro.</div>')
+    + secRej
+    +'<div class="rodape">Thor Business Consulting — documento gerado pelo LicitaFlow em '+emitido+'</div>'
+    +'</body></html>';
+}
+
+function imprimirRelatorio() {
+  if (!relFiltrar().length) { toast('Nenhuma licitação no filtro para imprimir.', 'info'); return; }
+  var html = relMontarImpressao();
+  var old = document.getElementById('rel-print-frame');
+  if (old) old.remove();
+  var iframe = document.createElement('iframe');
+  iframe.id = 'rel-print-frame';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(iframe);
+  var doc = iframe.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(function() {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch(e) { toast('Não foi possível abrir a impressão: '+e.message, 'error'); }
+  }, 350);
 }
 var ctxMenu = null;
 function openCtxMenu(e, cardId) {
